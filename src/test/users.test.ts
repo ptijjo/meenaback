@@ -21,16 +21,19 @@ describe('Testing Users', () => {
           id: 1,
           email: 'a@email.com',
           password: await bcrypt.hash('q1w2e3r4!', 10),
+          secretName:"tyh",
         },
         {
           id: 2,
           email: 'b@email.com',
           password: await bcrypt.hash('a1s2d3f4!', 10),
+          secretName:"tyh",
         },
         {
           id: 3,
           email: 'c@email.com',
           password: await bcrypt.hash('z1x2c3v4!', 10),
+          secretName:"tyh",
         },
       ]);
 
@@ -50,6 +53,7 @@ describe('Testing Users', () => {
         id: 1,
         email: 'a@email.com',
         password: await bcrypt.hash('q1w2e3r4!', 10),
+        secretName:"tyh",
       });
 
       const app = new App([usersRoute]);
@@ -62,7 +66,7 @@ describe('Testing Users', () => {
       const userData: CreateUserDto = {
         email: 'test@email.com',
         password: 'q1w2e3r4',
-        secretName:"adc"
+        secretName: "adc",
       };
 
       const usersRoute = new UserRoute();
@@ -73,6 +77,7 @@ describe('Testing Users', () => {
         id: 1,
         email: userData.email,
         password: await bcrypt.hash(userData.password, 10),
+        secretName:userData.secretName,
       });
 
       const app = new App([usersRoute]);
@@ -86,7 +91,8 @@ describe('Testing Users', () => {
       const userData: CreateUserDto = {
         email: 'test@email.com',
         password: 'q1w2e3r4',
-        secretName:"adf"
+        secretName: "adf",
+  
       };
 
       const usersRoute = new UserRoute();
@@ -96,11 +102,13 @@ describe('Testing Users', () => {
         id: userId,
         email: userData.email,
         password: await bcrypt.hash(userData.password, 10),
+        secretName:userData.secretName,
       });
       users.update = jest.fn().mockReturnValue({
         id: userId,
         email: userData.email,
         password: await bcrypt.hash(userData.password, 10),
+        secretName:userData.secretName,
       });
 
       const app = new App([usersRoute]);
@@ -124,11 +132,13 @@ describe('Testing Users', () => {
         id: userId,
         email: userData.email,
         password: await bcrypt.hash(userData.password, 10),
+        secretName:userData.secretName
       });
       users.delete = jest.fn().mockReturnValue({
         id: userId,
         email: userData.email,
         password: await bcrypt.hash(userData.password, 10),
+        secretName:userData.secretName,
       });
 
       const app = new App([usersRoute]);
