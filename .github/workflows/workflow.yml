@@ -51,7 +51,9 @@ jobs:
       - name: Copy coverage to root
         run: |
           rm -rf coverage-report
+          if [ -d "coverage" ]; then
           cp -r coverage coverage-report
+          fi
 
       - name: Configure Git
         run: |
