@@ -28,10 +28,11 @@ jobs:
         run: npm test -- --coverage
 
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: coverage/
+          retention-days: 30  # optionnel : définit la durée de rétention
 
   push-coverage:
     needs: test
@@ -54,3 +55,14 @@ jobs:
 
       - name: Configure Git
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit and push coverage
+        run: |
+          git checkout -B coverage-report
+          git add coverage-report
+          git commit -m "Update coverage report [skip ci]" || echo "No changes to commit"
+          git push origin coverage-report --force
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
