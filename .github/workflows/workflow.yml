@@ -32,7 +32,7 @@ jobs:
         with:
           name: coverage-report
           path: coverage/
-          retention-days: 30  # optionnel : définit la durée de rétention
+          retention-days: 30
 
   push-coverage:
     needs: test
@@ -48,11 +48,14 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Copy coverage to root
+      - name: Copy coverage to coverage-report
         run: |
-          rm -rf coverage-report
           if [ -d "coverage" ]; then
-          cp -r coverage coverage-report
+            rm -rf coverage-report
+            cp -r coverage coverage-report
+            echo "Coverage copied."
+          else
+            echo "No coverage directory found, skipping."
           fi
 
       - name: Configure Git
@@ -62,9 +65,13 @@ jobs:
 
       - name: Commit and push coverage
         run: |
-          git checkout -B coverage-report
-          git add coverage-report
-          git commit -m "Update coverage report [skip ci]" || echo "No changes to commit"
-          git push origin coverage-report --force
+          if [ -d "coverage-report" ]; then
+            git checkout -B coverage-report
+            git add coverage-report
+            git commit -m "Update coverage report [skip ci]" || echo "No changes to commit"
+            git push origin coverage-report --force
+          else
+            echo "No coverage-report directory to commit, skipping."
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
