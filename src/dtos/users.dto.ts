@@ -12,7 +12,7 @@ export class CreateUserDto {
 
   @IsString()
   @IsNotEmpty()
-  @MinLength(9)
+  @MinLength(1)
   @MaxLength(32)
   public secretName: string;
 }
@@ -23,4 +23,10 @@ export class UpdateUserDto {
   @MinLength(9)
   @MaxLength(32)
   public password: string;
+
+    @IsString()
+  @IsNotEmpty()
+  @MinLength(1)
+  @MaxLength(32)
+  public secretName: string;
 }
