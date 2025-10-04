@@ -19,7 +19,6 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "importHelpers": true,
-    //"baseUrl": "src",
     "paths": {
       "@/*": ["/src"],
       "@config": ["/src/config"],
