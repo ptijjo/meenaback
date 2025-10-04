@@ -1,11 +1,10 @@
 import { PrismaClient, User } from '@prisma/client';
 import { compare, hash } from 'bcrypt';
-import { sign } from 'jsonwebtoken';
 import { Service } from 'typedi';
-import { SECRET_KEY } from '../config';
 import { CreateUserDto } from '../dtos/users.dto';
+import { createToken } from '../utils/tokens';
+import { createCookie } from '../utils/cookies';
 import { HttpException } from '../exceptions/httpException';
-import { TokenData, DataStoredInToken } from '../interfaces/auth.interface';
 
 @Service()
 export class AuthService {
@@ -28,8 +27,8 @@ export class AuthService {
     const isPasswordMatching: boolean = await compare(userData.password, findUser.password);
     if (!isPasswordMatching) throw new HttpException(409, "Password is not matching");
 
-    const tokenData = this.createToken(findUser);
-    const cookie = this.createCookie(tokenData);
+    const tokenData = createToken(findUser);
+    const cookie = createCookie(tokenData);
 
     return { cookie, findUser };
   }
@@ -41,15 +40,4 @@ export class AuthService {
     return findUser;
   }
 
-  public createToken(user: User): TokenData {
-    const dataStoredInToken: DataStoredInToken = { id: user.id };
-    const secretKey: string = SECRET_KEY;
-    const expiresIn: number = 60 * 60;
-
-    return { expiresIn, token: sign(dataStoredInToken, secretKey, { expiresIn }) };
-  }
-
-  public createCookie(tokenData: TokenData): string {
-    return `Authorization=${tokenData.token}; HttpOnly; Max-Age=${tokenData.expiresIn};`;
-  }
 }

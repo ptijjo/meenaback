@@ -37,7 +37,7 @@ export class App {
   }
 
   public listen() {
-    this.app.listen(this.port, () => {
+    this.server.listen(this.port, () => {
       logger.info(`=================================`);
       logger.info(`======= ENV: ${this.env} =======`);
       logger.info(`🚀 App listening on the port ${this.port}`);
@@ -50,7 +50,9 @@ export class App {
   }
 
   private initializeMiddlewares() {
-    this.app.use(morgan(LOG_FORMAT_MORGAN, { stream }));
+    if (NODE_ENV !== 'test') {
+      this.app.use(morgan(LOG_FORMAT_MORGAN, { stream }));
+    }
     this.app.use(cors({ origin: ORIGIN, credentials: CREDENTIALS }));
     this.app.use(hpp());
     this.app.use(helmet());

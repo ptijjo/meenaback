@@ -10,6 +10,7 @@
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "node16",
     "module": "node16",
+    "isolatedModules": true,
     "pretty": true,
     "sourceMap": true,
     "declaration": true,
