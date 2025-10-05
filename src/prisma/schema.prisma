@@ -1,6 +1,6 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
+// ======================================
+// 📦 DATASOURCE & GENERATOR
+// ======================================
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -10,9 +10,234 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// ======================================
+// 🔸 ENUMS
+// ======================================
+enum Role {
+  user
+  modo
+  admin
+}
+
+enum RoleGroup {
+  admin
+  member
+}
+
+enum UserStatus {
+  onLine
+  away
+  offLine
+}
+
+enum Method2Fa {
+  email
+  sms
+  totp
+}
+
+enum TypeMessage {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  CALL
+}
+
+enum FriendshipStatus {
+  pending
+  accepted
+  blocked
+}
+
+// ======================================
+// 👤 USER & AUTH
+// ======================================
 model User {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  password      String
+  secretName    String
+  phone         String?
+  phoneVerified Boolean    @default(false)
+  googleId      String?    @unique
+  role          Role       @default(user)
+  status        UserStatus @default(offLine)
+  avatar        String     @default("https://vibz.s3.eu-central-1.amazonaws.com/logo/photoProfil.png")
+  is2FaEnable   Boolean    @default(false)
+  twoFaMethod   Method2Fa?
+  twoFaVerified Boolean    @default(false)
+  failedLoginAttempts Int  @default(0)
+  lockedUntil DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  LoginHistory  LoginHistory[]
+  Session       Session[]
+  RefreshToken  RefreshToken[]
+  userSecret    userSecret?
+  LoginAttempts LoginAttempts[]
+
+  // Groupes & Chat
+  groupsCreated        Group[]                   @relation("UserCreatedGroups")
+  groupMembers         GroupMember[]
+  conversations        ConversationParticipant[]
+  messages             Message[]
+  conversationsCreated Conversation[]             @relation("UserCreatedConversations")
+
+  DemandeurAmi Friendship[] @relation("FriendRequester")
+  ReceveurAmi  Friendship[] @relation("FriendAddressee")
+}
+
+// ======================================
+// 🔐 AUTH RELATIONS
+// ======================================
+model userSecret {
+  userId String @id
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name   String
+}
+
+model LoginHistory {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  refreshToken String
+  userAgent    String
+  ipAdress     String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  expiresAt    DateTime
+  isRevoked    Boolean  @default(false)
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  tokenHash String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  isRevoked Boolean  @default(false)
+  userAgent String
+  ipAdress  String
+}
+
+model LoginAttempts {
+  id        String   @id @default(cuid())
+  emailName String
+  email     User     @relation(fields: [emailName], references: [email])
+  success   Boolean
+  ipAddress String
+  createdAt DateTime @default(now())
+}
+
+// ======================================
+// 💬 GROUP SYSTEM
+// ======================================
+model Group {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  createdById String
+  createdBy   User     @relation("UserCreatedGroups", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members       GroupMember[]
+  conversations Conversation[]
+}
+
+model GroupMember {
   id       String    @id @default(cuid())
-  email    String @unique
-  password String
-  secretName String
+  userId   String
+  groupId  String
+  role     RoleGroup @default(member)
+  joinedAt DateTime  @default(now())
+
+  user  User  @relation(fields: [userId], references: [id])
+  group Group @relation(fields: [groupId], references: [id])
+
+  @@unique([userId, groupId])
+}
+
+model Friendship {
+  id          String           @id @default(cuid())
+  requesterId String
+  addresseeId String
+  status      FriendshipStatus @default(pending)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  requester User @relation("FriendRequester", fields: [requesterId], references: [id])
+  addressee User @relation("FriendAddressee", fields: [addresseeId], references: [id])
+
+  @@unique([requesterId, addresseeId])
+}
+
+// ======================================
+// 💭 CONVERSATION SYSTEM
+// ======================================
+model Conversation {
+  id        String   @id @default(cuid())
+  isGroup   Boolean  @default(false)
+  groupId   String?
+  group     Group?   @relation(fields: [groupId], references: [id])
+  name      String?
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  authorId  String
+  author    User     @relation("UserCreatedConversations", fields: [authorId], references: [id])
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([authorId])
+  @@index([createdAt])
+}
+
+model ConversationParticipant {
+  id             String   @id @default(cuid())
+  userId         String
+  conversationId String
+  joinedAt       DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id])
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+
+  @@unique([userId, conversationId])
+}
+
+// ======================================
+// 📨 MESSAGES
+// ======================================
+model Message {
+  id            String      @id @default(cuid())
+  content       String
+  type          TypeMessage @default(TEXT)
+  attachmentUrl String?
+  read          Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  senderId       String
+  conversationId String
+
+  sender       User         @relation(fields: [senderId], references: [id])
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+
+  @@index([senderId])
+  @@index([conversationId])
+  @@index([createdAt])
 }

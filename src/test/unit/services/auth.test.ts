@@ -60,7 +60,7 @@ describe('AuthService', () => {
     it('should throw if user not found', async () => {
       prismaUserMock.findUnique.mockResolvedValue(null);
 
-      await expect(authService.login({ email: 'unknown@example.com', password: 'pass', secretName:"iop" }))
+      await expect(authService.login({ email: 'unknown@example.com', password: 'pass', ipAdress:"iop",userAgent:"pmlo" }))
         .rejects.toThrow(HttpException);
     });
 
@@ -68,7 +68,7 @@ describe('AuthService', () => {
       prismaUserMock.findUnique.mockResolvedValue({ email: 'test@example.com', password: 'hash' });
       (compare as jest.Mock).mockResolvedValue(false);
 
-      await expect(authService.login({ email: 'test@example.com', password: 'wrong',secretName:"iop" }))
+      await expect(authService.login({ email: 'test@example.com', password: 'wrong',ipAdress:"iop",userAgent:"pmlo" }))
         .rejects.toThrow(HttpException);
     });
 
@@ -79,7 +79,7 @@ describe('AuthService', () => {
       (createToken as jest.Mock).mockReturnValue('token');
       (createCookie as jest.Mock).mockReturnValue('cookie');
 
-      const result = await authService.login({ email: 'test@example.com', password: 'pass',secretName:"iop" });
+      const result = await authService.login({ email: 'test@example.com', password: 'pass',ipAdress:"iop",userAgent:"pmlo" });
       expect(result).toEqual({ cookie: 'cookie', findUser: user });
     });
   });
