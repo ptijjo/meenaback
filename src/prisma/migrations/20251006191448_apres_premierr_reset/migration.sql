@@ -1,10 +1,3 @@
-/*
-  Warnings:
-
-  - A unique constraint covering the columns `[googleId]` on the table `User` will be added. If there are existing duplicate values, this will fail.
-  - Added the required column `updatedAt` to the `User` table without a default value. This is not possible if the table is not empty.
-
-*/
 -- CreateEnum
 CREATE TYPE "Role" AS ENUM ('user', 'modo', 'admin');
 
@@ -23,20 +16,28 @@ CREATE TYPE "TypeMessage" AS ENUM ('TEXT', 'IMAGE', 'VIDEO', 'AUDIO', 'CALL');
 -- CreateEnum
 CREATE TYPE "FriendshipStatus" AS ENUM ('pending', 'accepted', 'blocked');
 
--- AlterTable
-ALTER TABLE "User" ADD COLUMN     "avatar" TEXT NOT NULL DEFAULT 'https://vibz.s3.eu-central-1.amazonaws.com/logo/photoProfil.png',
-ADD COLUMN     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-ADD COLUMN     "failedLoginAttempts" INTEGER NOT NULL DEFAULT 0,
-ADD COLUMN     "googleId" TEXT,
-ADD COLUMN     "is2FaEnable" BOOLEAN NOT NULL DEFAULT false,
-ADD COLUMN     "lockedUntil" TIMESTAMP(3),
-ADD COLUMN     "phone" TEXT,
-ADD COLUMN     "phoneVerified" BOOLEAN NOT NULL DEFAULT false,
-ADD COLUMN     "role" "Role" NOT NULL DEFAULT 'user',
-ADD COLUMN     "status" "UserStatus" NOT NULL DEFAULT 'offLine',
-ADD COLUMN     "twoFaMethod" "Method2Fa",
-ADD COLUMN     "twoFaVerified" BOOLEAN NOT NULL DEFAULT false,
-ADD COLUMN     "updatedAt" TIMESTAMP(3) NOT NULL;
+-- CreateTable
+CREATE TABLE "User" (
+    "id" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "password" TEXT,
+    "secretName" TEXT NOT NULL,
+    "phone" TEXT,
+    "phoneVerified" BOOLEAN NOT NULL DEFAULT false,
+    "googleId" TEXT,
+    "role" "Role" NOT NULL DEFAULT 'user',
+    "status" "UserStatus" NOT NULL DEFAULT 'offLine',
+    "avatar" TEXT NOT NULL DEFAULT 'https://vibz.s3.eu-central-1.amazonaws.com/logo/photoProfil.png',
+    "is2FaEnable" BOOLEAN NOT NULL DEFAULT false,
+    "twoFaMethod" "Method2Fa",
+    "twoFaVerified" BOOLEAN NOT NULL DEFAULT false,
+    "failedLoginAttempts" INTEGER NOT NULL DEFAULT 0,
+    "lockedUntil" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "User_pkey" PRIMARY KEY ("id")
+);
 
 -- CreateTable
 CREATE TABLE "userSecret" (
@@ -61,7 +62,7 @@ CREATE TABLE "Session" (
     "userId" TEXT NOT NULL,
     "refreshToken" TEXT NOT NULL,
     "userAgent" TEXT NOT NULL,
-    "ipAdress" TEXT NOT NULL,
+    "ipAddress" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "expiresAt" TIMESTAMP(3) NOT NULL,
@@ -171,6 +172,12 @@ CREATE TABLE "Message" (
 );
 
 -- CreateIndex
+CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "User_googleId_key" ON "User"("googleId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "RefreshToken_tokenHash_key" ON "RefreshToken"("tokenHash");
 
 -- CreateIndex
@@ -196,9 +203,6 @@ CREATE INDEX "Message_conversationId_idx" ON "Message"("conversationId");
 
 -- CreateIndex
 CREATE INDEX "Message_createdAt_idx" ON "Message"("createdAt");
-
--- CreateIndex
-CREATE UNIQUE INDEX "User_googleId_key" ON "User"("googleId");
 
 -- AddForeignKey
 ALTER TABLE "userSecret" ADD CONSTRAINT "userSecret_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

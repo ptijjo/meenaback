@@ -21,8 +21,11 @@ export class AuthController {
 
   public logIn = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userData: User = req.body;
-      const { cookie, findUser } = await this.auth.login(userData);
+      const userData = req.body;
+      const ipAddress = String(req.ip || 'unknown');
+      const userAgent = String(req.headers['user-agent'] || 'unknown');
+
+      const { cookie, findUser } = await this.auth.login(userData,ipAddress,userAgent);
 
       res.setHeader('Set-Cookie', [cookie]);
       res.status(200).json({ data: findUser, message: 'login' });
@@ -33,8 +36,11 @@ export class AuthController {
 
   public logOut = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userData: User = req.user;
-      const logOutUserData: User = await this.auth.logout(userData);
+      const id: string = req.user.id;
+
+
+
+      const logOutUserData: User = await this.auth.logout(id);
 
       res.setHeader('Set-Cookie', ['Authorization=; Max-age=0']);
       res.status(200).json({ data: logOutUserData, message: 'logout' });

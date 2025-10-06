@@ -54,21 +54,24 @@ enum FriendshipStatus {
 // 👤 USER & AUTH
 // ======================================
 model User {
-  id            String     @id @default(cuid())
-  email         String     @unique
-  password      String
-  secretName    String
-  phone         String?
-  phoneVerified Boolean    @default(false)
-  googleId      String?    @unique
-  role          Role       @default(user)
-  status        UserStatus @default(offLine)
-  avatar        String     @default("https://vibz.s3.eu-central-1.amazonaws.com/logo/photoProfil.png")
-  is2FaEnable   Boolean    @default(false)
-  twoFaMethod   Method2Fa?
-  twoFaVerified Boolean    @default(false)
-  failedLoginAttempts Int  @default(0)
-  lockedUntil DateTime?
+  id                    String     @id @default(cuid())
+  email                 String     @unique
+  password              String?
+  secretName            String
+  phone                 String?
+  phoneVerified         Boolean    @default(false)
+  googleId              String?    @unique
+  role                  Role       @default(user)
+  status                UserStatus @default(offLine)
+  avatar                String     @default("https://vibz.s3.eu-central-1.amazonaws.com/logo/photoProfil.png")
+  is2FaEnable           Boolean    @default(false)
+  twoFaMethod           Method2Fa?
+  twoFaVerified         Boolean    @default(false)
+  failedLoginAttempts   Int        @default(0)
+  lockedUntil           DateTime?
+  isVerified            Boolean    @default(false)
+  verificationToken     String?
+  verificationExpiresAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -85,7 +88,7 @@ model User {
   groupMembers         GroupMember[]
   conversations        ConversationParticipant[]
   messages             Message[]
-  conversationsCreated Conversation[]             @relation("UserCreatedConversations")
+  conversationsCreated Conversation[]            @relation("UserCreatedConversations")
 
   DemandeurAmi Friendship[] @relation("FriendRequester")
   ReceveurAmi  Friendship[] @relation("FriendAddressee")
@@ -113,7 +116,7 @@ model Session {
   user         User     @relation(fields: [userId], references: [id])
   refreshToken String
   userAgent    String
-  ipAdress     String
+  ipAddress    String
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   expiresAt    DateTime

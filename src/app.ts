@@ -10,10 +10,9 @@ import swaggerJSDoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 import http from 'http';
 import { Routes } from './interfaces/routes.interface';
-import { stream } from 'winston';
 import { NODE_ENV, PORT, LOG_FORMAT, ORIGIN, CREDENTIALS } from './config';
 import { ErrorMiddleware } from './middlewares/error.middleware';
-import { logger } from './utils/logger';
+import { logger,stream } from './utils/logger';
 
 type MorganFormat = 'dev' | 'combined';
 const LOG_FORMAT_MORGAN: MorganFormat = (LOG_FORMAT as MorganFormat) || 'dev';
@@ -50,9 +49,8 @@ export class App {
   }
 
   private initializeMiddlewares() {
-    if (NODE_ENV !== 'test') {
-      this.app.use(morgan(LOG_FORMAT_MORGAN, { stream }));
-    }
+   
+    this.app.use(morgan(LOG_FORMAT_MORGAN, { stream }));
     this.app.use(cors({ origin: ORIGIN, credentials: CREDENTIALS }));
     this.app.use(hpp());
     this.app.use(helmet());
