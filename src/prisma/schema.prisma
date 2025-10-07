@@ -114,7 +114,8 @@ model Session {
   id           String   @id @default(cuid())
   userId       String
   user         User     @relation(fields: [userId], references: [id])
-  refreshToken String
+  refreshToken String  // hash du refresh token
+  jti           String   @unique // identifiant unique du refresh token (JWT ID)
   userAgent    String
   ipAddress    String
   createdAt    DateTime @default(now())

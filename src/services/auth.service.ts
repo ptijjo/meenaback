@@ -2,12 +2,13 @@ import { PrismaClient, User } from '@prisma/client';
 import { compare, hash } from 'bcrypt';
 import { Service } from 'typedi';
 import { CreateUserDto } from '../dtos/users.dto';
-import { createToken } from '../utils/tokens';
+import { createAccessToken, createRefreshToken } from '../utils/tokens';
 import { createCookie } from '../utils/cookies';
 import { HttpException } from '../exceptions/httpException';
 import { CreateAuthDto } from '../dtos/auth.dto';
-import { EXPIRES_SESSION, MAX_ACTIVE_SESSIONS } from '../config';
+import { MAX_ACTIVE_SESSIONS, REFRESH_TOKEN_SECRET } from '../config';
 import { UserSecret } from '../interfaces/userSecret.interface';
+import { verify } from 'jsonwebtoken';
 
 @Service()
 export class AuthService {
@@ -31,7 +32,11 @@ export class AuthService {
     return createUserData;
   }
 
-  public async login(userData: CreateAuthDto, ipAddressData: string, userAgentData: string): Promise<{ cookie: string; findUser: User }> {
+  public async login(
+    userData: CreateAuthDto,
+    ipAddressData: string,
+    userAgentData: string,
+  ): Promise<{ cookie: string; findUser: User; accessToken: string }> {
     // 1️⃣ Vérifier si l'utilisateur existe
     const findUser = await this.prisma.user.findUnique({
       where: { email: userData.email },
@@ -41,10 +46,6 @@ export class AuthService {
     // 2️⃣ Vérifier si le compte est temporairement verrouillé
     if (findUser.lockedUntil && findUser.lockedUntil > new Date()) {
       throw new HttpException(403, 'Compte temporairement verrouillé');
-    }
-
-    if (!findUser.isVerified) {
-      throw new HttpException(403, 'Veuillez vérifier votre email avant de vous connecter.');
     }
 
     // 3️⃣ Vérifier le mot de passe
@@ -84,110 +85,148 @@ export class AuthService {
       data: { failedLoginAttempts: 0, lockedUntil: null },
     });
 
-    // 7️⃣ Générer token et cookie
-    const tokenData = createToken(findUser);
-    const cookie = createCookie(tokenData);
-
-    // 8️⃣ Hasher le refresh token avant stockage
-    const refreshHash = await hash(tokenData.token, 10);
-
-    // 9️⃣ Limiter les sessions actives à 3
-    const activeSessions = await this.prisma.session.findMany({
-      where: { userId: findUser.id, isRevoked: false },
-      orderBy: { createdAt: 'asc' }, // les plus anciennes en premier
-      select: { id: true },
+    // 7️⃣ Vérifier une session existante (même IP + User-Agent)
+    const existingSession = await this.prisma.session.findFirst({
+      where: {
+        userId: findUser.id,
+        ipAddress: ipAddressData,
+        userAgent: userAgentData,
+        isRevoked: false,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
     });
 
-    if (activeSessions.length >= Number(MAX_ACTIVE_SESSIONS)) {
-      const toRevokeCount = activeSessions.length - (Number(MAX_ACTIVE_SESSIONS) - 1);
-      if (toRevokeCount > 0) {
-        const idsToRevoke = activeSessions.slice(0, toRevokeCount).map(s => s.id);
-        await this.prisma.session.updateMany({
-          where: { id: { in: idsToRevoke } },
-          data: { isRevoked: true },
-        });
+    // 8️⃣ Si session existante → on la renouvelle, sinon on en crée une nouvelle
+    let refreshTokenData;
+    if (existingSession) {
+      // Renouvelle le refresh token
+      refreshTokenData = createRefreshToken(findUser);
+      const refreshHash = await hash(refreshTokenData.token, 10);
+
+      await this.prisma.session.update({
+        where: { id: existingSession.id },
+        data: {
+          refreshToken: refreshHash,
+          jti: refreshTokenData.jti,
+          expiresAt: new Date(Date.now() + refreshTokenData.expiresIn * 1000),
+        },
+      });
+    } else {
+      // Vérifie le nombre de sessions actives
+      const activeSessionsCount = await this.prisma.session.count({
+        where: {
+          userId: findUser.id,
+          isRevoked: false,
+          expiresAt: { gt: new Date() },
+        },
+      });
+
+      if (activeSessionsCount >= Number(MAX_ACTIVE_SESSIONS)) {
+        throw new HttpException(
+          403,
+          `La limite de ${MAX_ACTIVE_SESSIONS} sessions actives est atteinte. Veuillez en fermer une avant de vous reconnecter.`,
+        );
       }
+
+      // Crée une nouvelle session
+      refreshTokenData = createRefreshToken(findUser);
+      const refreshHash = await hash(refreshTokenData.token, 10);
+
+      await this.prisma.session.create({
+        data: {
+          user: { connect: { id: findUser.id } },
+          refreshToken: refreshHash,
+          jti: refreshTokenData.jti,
+          userAgent: userAgentData,
+          ipAddress: ipAddressData,
+          expiresAt: new Date(Date.now() + refreshTokenData.expiresIn * 1000),
+        },
+      });
     }
 
-    // 🔟 Créer la nouvelle session
-    await this.prisma.session.create({
-      data: {
-        user: { connect: { id: findUser.id } },
-        refreshToken: refreshHash,
-        userAgent: userAgentData,
-        ipAddress: ipAddressData,
-        expiresAt: new Date(Date.now() + Number(EXPIRES_SESSION)),
-      },
-    });
-
-    // 1️⃣1️⃣ Marquer les sessions expirées comme révoquées
+    // 9️⃣ Révoquer les sessions expirées
     await this.prisma.session.updateMany({
       where: { expiresAt: { lt: new Date() }, isRevoked: false },
       data: { isRevoked: true },
     });
 
-    // 1️⃣2️⃣ Créer un historique de connexion
+    // 🔟 Créer un Access Token pour l'utilisateur
+    const accessTokenData = createAccessToken(findUser);
+
+    // 1️⃣1️⃣ Créer un cookie HTTPOnly avec le Refresh Token
+    const cookie = createCookie(refreshTokenData);
+
+    // 1️⃣2️⃣ Historiser la connexion
     await this.prisma.loginHistory.create({
-      data: {
-        user: { connect: { id: findUser.id } },
-      },
+      data: { user: { connect: { id: findUser.id } } },
     });
 
-    return { cookie, findUser };
+    return { cookie, findUser, accessToken: accessTokenData.token };
   }
 
   public async refreshToken(oldRefreshToken: string, ipAddress: string, userAgent: string): Promise<{ cookie: string; accessToken: string }> {
-    // 1️⃣ Trouver la session correspondante au refresh token (hashé)
-    const sessions = await this.prisma.session.findMany({
-      where: { isRevoked: false },
+    let decoded: any;
+    try {
+      decoded = verify(oldRefreshToken, REFRESH_TOKEN_SECRET);
+    } catch (err) {
+      throw new HttpException(401, 'Refresh token invalide');
+    }
+
+    const { id: userId, jti } = decoded;
+
+    // 1️⃣ Rechercher la session via la JTI (et user)
+    const session = await this.prisma.session.findUnique({
+      where: { jti },
       include: { user: true },
     });
 
-    let sessionFound = null;
-    for (const s of sessions) {
-      if (await compare(oldRefreshToken, s.refreshToken)) {
-        sessionFound = s;
-        break;
-      }
+    if (!session || session.isRevoked) {
+      throw new HttpException(401, 'Session invalide ou révoquée');
     }
 
-    if (!sessionFound) {
-      throw new HttpException(401, 'Refresh token invalide ou révoqué');
-    }
-
-    // 2️⃣ Vérifier si la session est expirée
-    if (sessionFound.expiresAt < new Date()) {
-      // Révoquer la session
+    // 2️⃣ Vérifier l'expiration
+    if (session.expiresAt < new Date()) {
       await this.prisma.session.update({
-        where: { id: sessionFound.id },
+        where: { id: session.id },
         data: { isRevoked: true },
       });
       throw new HttpException(401, 'Session expirée, veuillez vous reconnecter');
     }
 
-    const user = sessionFound.user;
+    // 3️⃣ Comparer le token reçu avec le hash stocké
+    const isMatch = await compare(oldRefreshToken, session.refreshToken);
+    if (!isMatch) {
+      throw new HttpException(401, 'Refresh token non reconnu');
+    }
 
-    // 3️⃣ Générer un nouveau token et cookie
-    const tokenData = createToken(user);
-    const cookie = createCookie(tokenData);
+    const user = session.user;
 
-    // 4️⃣ Hasher le nouveau refresh token
-    const newRefreshHash = await hash(tokenData.token, 10);
+    // 4️⃣ Générer un NOUVEAU access token + refresh token
+    const newAccessTokenData = createAccessToken(user);
+    const newRefreshTokenData = createRefreshToken(user);
+    const newRefreshHash = await hash(newRefreshTokenData.token, 10);
 
-    // 5️⃣ Mettre à jour la session existante avec le nouveau refresh token et infos
+    // 5️⃣ Mettre à jour la session avec le NOUVEAU refresh token
     await this.prisma.session.update({
-      where: { id: sessionFound.id },
+      where: { id: session.id },
       data: {
         refreshToken: newRefreshHash,
+        jti: newRefreshTokenData.jti,
         ipAddress,
         userAgent,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // prolonger 7 jours
+        expiresAt: new Date(Date.now() + newRefreshTokenData.expiresIn * 1000),
       },
     });
 
-    return { cookie, accessToken: tokenData.token };
-  }
+    // 6️⃣ Créer un cookie HTTPOnly avec le nouveau refresh token
+    const cookie = createCookie(newRefreshTokenData);
 
+    return {
+      cookie,
+      accessToken: newAccessTokenData.token,
+    };
+  }
   public async logout(idData: string): Promise<User> {
     const findUser: User = await this.users.findFirst({ where: { id: idData } });
     if (!findUser) throw new HttpException(409, "User doesn't exist");
