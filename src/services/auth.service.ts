@@ -1,27 +1,53 @@
 import { PrismaClient, User } from '@prisma/client';
 import { compare, hash } from 'bcrypt';
-import { Service } from 'typedi';
+import Container, { Service } from 'typedi';
 import { CreateUserDto } from '../dtos/users.dto';
 import { createAccessToken, createRefreshToken } from '../utils/tokens';
 import { createCookie } from '../utils/cookies';
 import { HttpException } from '../exceptions/httpException';
 import { CreateAuthDto } from '../dtos/auth.dto';
-import { MAX_ACTIVE_SESSIONS, REFRESH_TOKEN_SECRET } from '../config';
-import { UserSecret } from '../interfaces/userSecret.interface';
+import {
+  EXPIRES_TOKEN_VERIFICATION_EMAIL,
+  MAX_ACTIVE_SESSIONS,
+  NUMBER_OF_FAIL_BEFORE_LOCK,
+  REFRESH_TOKEN_SECRET,
+  TIME_LOCK,
+  VERIFICATION_EMAIL_LINK,
+} from '../config';
 import { verify } from 'jsonwebtoken';
+import { randomBytes } from 'crypto';
+import { MailService } from './mails.service';
 
 @Service()
 export class AuthService {
   public users = new PrismaClient().user;
   public prisma = new PrismaClient();
+  public mailService = Container.get(MailService);
 
   public async signup(userData: CreateUserDto): Promise<User> {
+    // 1️⃣ Vérifie si l’utilisateur existe déjà
     const findUser: User = await this.users.findUnique({ where: { email: userData.email } });
     if (findUser) throw new HttpException(409, `This email ${userData.email} already exists`);
 
+    // 2️⃣ Hasher le mot de passe
     const hashedPassword = await hash(userData.password, 10);
-    const createUserData: User = await this.users.create({ data: { ...userData, password: hashedPassword } });
 
+    // 3️⃣ Générer un token de vérification unique
+    const verificationToken = randomBytes(32).toString('hex');
+    const verificationExpiresAt = new Date(Date.now() + Number(EXPIRES_TOKEN_VERIFICATION_EMAIL)); // 48h
+
+    // 4️⃣ Créer l’utilisateur non vérifié
+    const createUserData: User = await this.users.create({
+      data: {
+        ...userData,
+        password: hashedPassword,
+        isVerified: false,
+        verificationToken,
+        verificationExpiresAt,
+      },
+    });
+
+    // 5️⃣ Créer le secret associé
     await this.prisma.userSecret.create({
       data: {
         name: createUserData.secretName,
@@ -29,7 +55,39 @@ export class AuthService {
       },
     });
 
+    // 6️⃣ Envoi de l'email de vérification (mock pour le moment)
+
+    const verificationLink = `${VERIFICATION_EMAIL_LINK}${verificationToken}`;
+    console.log(`📧 Lien de vérification envoyé à ${createUserData.email} : ${verificationLink}`);
+
+    await this.mailService.sendEmailVerification(createUserData.email, verificationLink);
+
     return createUserData;
+  }
+
+  public async verifyEmail(token: string): Promise<User> {
+    // 1️⃣ Trouver l’utilisateur avec ce token
+    const user = await this.prisma.user.findFirst({ where: { verificationToken: token } });
+
+    if (!user) throw new HttpException(400, 'Lien de vérification invalide');
+    if (user.isVerified) throw new HttpException(400, 'Ce compte est déjà vérifié');
+    if (user.verificationExpiresAt && user.verificationExpiresAt < new Date()) {
+      // Supprimer le compte expiré
+      await this.prisma.user.delete({ where: { id: user.id } });
+      throw new HttpException(410, 'Le lien a expiré, veuillez vous réinscrire');
+    }
+
+    // 2️⃣ Activer le compte
+    const verifiedUser = await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        isVerified: true,
+        verificationToken: null,
+        verificationExpiresAt: null,
+      },
+    });
+
+    return verifiedUser;
   }
 
   public async login(
@@ -43,9 +101,14 @@ export class AuthService {
     });
     if (!findUser) throw new HttpException(401, 'Identifiants incorrects');
 
+    //si il n'a pas encore vérifier son adresse mail il ne pourra pas se connecter
+    if (!findUser.isVerified) {
+      throw new HttpException(403, 'Merci de vérifier votre email avant de vous connecter');
+    }
+
     // 2️⃣ Vérifier si le compte est temporairement verrouillé
     if (findUser.lockedUntil && findUser.lockedUntil > new Date()) {
-      throw new HttpException(403, 'Compte temporairement verrouillé');
+      throw new HttpException(403, `Compte temporairement verrouillé jusqu'à ${findUser.lockedUntil}`);
     }
 
     // 3️⃣ Vérifier le mot de passe
@@ -53,21 +116,22 @@ export class AuthService {
     const success = isPasswordMatching;
 
     // 4️⃣ Enregistrer la tentative de connexion
-    await this.prisma.loginAttempts.create({
-      data: {
-        ipAddress: ipAddressData,
-        email: { connect: { email: findUser.email } },
-        success,
-      },
-    });
 
     // 5️⃣ Gestion des échecs
     if (!success) {
+      await this.prisma.loginAttempts.create({
+        data: {
+          ipAddress: ipAddressData,
+          email: { connect: { email: findUser.email } },
+          success: false,
+        },
+      });
+
       let failed = findUser.failedLoginAttempts + 1;
       let lockedUntil: Date | null = null;
 
-      if (failed >= 5) {
-        lockedUntil = new Date(Date.now() + 30 * 60 * 1000); // verrouillage 30 min
+      if (failed >= Number(NUMBER_OF_FAIL_BEFORE_LOCK)) {
+        lockedUntil = new Date(Date.now() + Number(TIME_LOCK)); // verrouillage 30 min
         failed = 0;
       }
 
@@ -76,13 +140,20 @@ export class AuthService {
         data: { failedLoginAttempts: failed, lockedUntil },
       });
 
-      throw new HttpException(401, 'Mot de passe incorrect');
+      throw new HttpException(401, 'Identifiants incorrects');
     }
 
     // 6️⃣ Réinitialiser les échecs
     await this.prisma.user.update({
       where: { email: findUser.email },
       data: { failedLoginAttempts: 0, lockedUntil: null },
+    });
+
+    // ➕ Historique de connexion réussie
+    await this.prisma.loginHistory.create({
+      data: {
+        user: { connect: { id: findUser.id } },
+      },
     });
 
     // 7️⃣ Vérifier une session existante (même IP + User-Agent)
@@ -107,7 +178,6 @@ export class AuthService {
       await this.prisma.session.update({
         where: { id: existingSession.id },
         data: {
-          refreshToken: refreshHash,
           jti: refreshTokenData.jti,
           expiresAt: new Date(Date.now() + refreshTokenData.expiresIn * 1000),
         },
@@ -136,7 +206,6 @@ export class AuthService {
       await this.prisma.session.create({
         data: {
           user: { connect: { id: findUser.id } },
-          refreshToken: refreshHash,
           jti: refreshTokenData.jti,
           userAgent: userAgentData,
           ipAddress: ipAddressData,
@@ -195,23 +264,23 @@ export class AuthService {
     }
 
     // 3️⃣ Comparer le token reçu avec le hash stocké
-    const isMatch = await compare(oldRefreshToken, session.refreshToken);
-    if (!isMatch) {
-      throw new HttpException(401, 'Refresh token non reconnu');
-    }
+    // const isMatch = await compare(oldRefreshToken, session.refreshToken);
+    // if (!isMatch) {
+    //   throw new HttpException(401, 'Refresh token non reconnu');
+    // }
 
     const user = session.user;
 
     // 4️⃣ Générer un NOUVEAU access token + refresh token
     const newAccessTokenData = createAccessToken(user);
     const newRefreshTokenData = createRefreshToken(user);
-    const newRefreshHash = await hash(newRefreshTokenData.token, 10);
+    //const newRefreshHash = await hash(newRefreshTokenData.token, 10);
+    const newJti = newRefreshTokenData.jti;
 
-    // 5️⃣ Mettre à jour la session avec le NOUVEAU refresh token
+    // 5️⃣ Mettre à jour la session avec le NOUVEAU Jti
     await this.prisma.session.update({
       where: { id: session.id },
       data: {
-        refreshToken: newRefreshHash,
         jti: newRefreshTokenData.jti,
         ipAddress,
         userAgent,

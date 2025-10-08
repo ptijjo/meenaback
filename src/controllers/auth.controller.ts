@@ -4,7 +4,6 @@ import { Container } from 'typedi';
 import { RequestWithUser } from '../interfaces/auth.interface';
 import { AuthService } from '../services/auth.service';
 
-
 export class AuthController {
   public auth = Container.get(AuthService);
 
@@ -19,13 +18,19 @@ export class AuthController {
     }
   };
 
+  public verifyEmail = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const token = req.query.token as string;
+    const result = await this.auth.verifyEmail(token);
+    res.status(200).json(result);
+  };
+
   public logIn = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userData = req.body;
       const ipAddress = String(req.ip || 'unknown');
       const userAgent = String(req.headers['user-agent'] || 'unknown');
 
-      const { cookie, findUser } = await this.auth.login(userData,ipAddress,userAgent);
+      const { cookie, findUser } = await this.auth.login(userData, ipAddress, userAgent);
 
       res.setHeader('Set-Cookie', [cookie]);
       res.status(200).json({ data: findUser, message: 'login' });
@@ -37,8 +42,6 @@ export class AuthController {
   public logOut = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
     try {
       const id: string = req.user.id;
-
-
 
       const logOutUserData: User = await this.auth.logout(id);
 

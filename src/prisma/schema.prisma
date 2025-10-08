@@ -79,7 +79,6 @@ model User {
   // Relations
   LoginHistory  LoginHistory[]
   Session       Session[]
-  RefreshToken  RefreshToken[]
   userSecret    userSecret?
   LoginAttempts LoginAttempts[]
 
@@ -107,14 +106,13 @@ model LoginHistory {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id],onDelete: Cascade)
 }
 
 model Session {
   id           String   @id @default(cuid())
   userId       String
-  user         User     @relation(fields: [userId], references: [id])
-  refreshToken String  // hash du refresh token
+  user         User     @relation(fields: [userId], references: [id],onDelete: Cascade)
   jti           String   @unique // identifiant unique du refresh token (JWT ID)
   userAgent    String
   ipAddress    String
@@ -124,22 +122,11 @@ model Session {
   isRevoked    Boolean  @default(false)
 }
 
-model RefreshToken {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  tokenHash String   @unique
-  createdAt DateTime @default(now())
-  expiresAt DateTime
-  isRevoked Boolean  @default(false)
-  userAgent String
-  ipAdress  String
-}
 
 model LoginAttempts {
   id        String   @id @default(cuid())
   emailName String
-  email     User     @relation(fields: [emailName], references: [email])
+  email     User     @relation(fields: [emailName], references: [email],onDelete: Cascade)
   success   Boolean
   ipAddress String
   createdAt DateTime @default(now())
