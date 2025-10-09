@@ -2,7 +2,7 @@ import { PrismaClient, User } from '@prisma/client';
 import { compare, hash } from 'bcrypt';
 import Container, { Service } from 'typedi';
 import { CreateUserDto } from '../dtos/users.dto';
-import { createAccessToken, createRefreshToken } from '../utils/tokens';
+import { createAccessToken, createRefreshToken, RefreshTokenData } from '../utils/tokens';
 import { createCookie } from '../utils/cookies';
 import { HttpException } from '../exceptions/httpException';
 import { CreateAuthDto } from '../dtos/auth.dto';
@@ -17,6 +17,9 @@ import {
 import { verify } from 'jsonwebtoken';
 import { randomBytes } from 'crypto';
 import { MailService } from './mails.service';
+import { Session } from '../interfaces/session.interface';
+import { v4 as uuidv4 } from 'uuid';
+import { TokenData } from '../interfaces/auth.interface';
 
 @Service()
 export class AuthService {
@@ -95,6 +98,106 @@ export class AuthService {
     ipAddressData: string,
     userAgentData: string,
   ): Promise<{ cookie: string; findUser: User; accessToken: string }> {
+    //GoogleId present
+    if (userData.googleId) {
+      let findUser: User = await this.users.findUnique({ where: { googleId: userData.googleId } });
+
+      // Vérifier s'il existe déjà un utilisateur avec le même email
+      const existingByEmail = await this.users.findUnique({ where: { email: userData.email } });
+
+      if (existingByEmail) {
+        // On associe le googleId au compte existant
+        findUser = await this.prisma.user.update({
+          where: { id: existingByEmail.id },
+          data: { googleId: userData.googleId },
+        });
+      }
+
+      // Si pas d'utilisateur → on le crée à la volée
+      if (!findUser) {
+        //on cré un user dans la bdd avec l'email + googleId et le le connecte
+        findUser = await this.prisma.user.create({
+          data: {
+            email: userData.email,
+            googleId: userData.googleId,
+            secretName: `user` + String(uuidv4()),
+            isVerified: true,
+          },
+        });
+      }
+
+      // Vérifier une session existante (même IP + User-Agent)
+      const existingSession = await this.prisma.session.findFirst({
+        where: {
+          userId: findUser.id,
+          ipAddress: ipAddressData,
+          userAgent: userAgentData,
+          isRevoked: false,
+          expiresAt: { gt: new Date() },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      // refreshTokenData sera défini dans les deux cas
+      let refreshTokenData: RefreshTokenData;
+      if (existingSession) {
+        // Renouveler : créer un nouveau refresh token (JWT avec jti)
+        refreshTokenData = createRefreshToken(findUser);
+
+        await this.prisma.session.update({
+          where: { id: existingSession.id },
+          data: {
+            jti: refreshTokenData.jti,
+            expiresAt: new Date(Date.now() + refreshTokenData.expiresIn * 1000),
+          },
+        });
+      } else {
+        // Vérifier le nombre de sessions actives
+        const activeSessionsCount = await this.prisma.session.count({
+          where: { userId: findUser.id, isRevoked: false, expiresAt: { gt: new Date() } },
+        });
+
+        if (activeSessionsCount >= Number(MAX_ACTIVE_SESSIONS)) {
+          throw new HttpException(
+            403,
+            `La limite de ${MAX_ACTIVE_SESSIONS} sessions actives est atteinte. Veuillez en fermer une avant de vous reconnecter.`,
+          );
+        }
+
+        // Créer une nouvelle session (avec jti)
+        refreshTokenData = createRefreshToken(findUser);
+
+        await this.prisma.session.create({
+          data: {
+            user: { connect: { id: findUser.id } },
+            jti: refreshTokenData.jti,
+            userAgent: userAgentData,
+            ipAddress: ipAddressData,
+            expiresAt: new Date(Date.now() + refreshTokenData.expiresIn * 1000),
+          },
+        });
+      }
+
+      // Révoquer les sessions expirées
+      await this.prisma.session.updateMany({
+        where: { expiresAt: { lt: new Date() }, isRevoked: false },
+        data: { isRevoked: true },
+      });
+
+      // Générer l'access token (une seule fois)
+      const accessTokenData = createAccessToken(findUser);
+
+      // Créer le cookie HTTPOnly (avec le refresh token JWT)
+      const cookie = createCookie(refreshTokenData);
+
+      // Historiser la connexion (une seule fois)
+      await this.prisma.loginHistory.create({
+        data: { user: { connect: { id: findUser.id } } },
+      });
+
+      return { cookie, findUser, accessToken: accessTokenData.token };
+    }
+
     // 1️⃣ Vérifier si l'utilisateur existe
     const findUser = await this.prisma.user.findUnique({
       where: { email: userData.email },
@@ -115,7 +218,6 @@ export class AuthService {
     const isPasswordMatching = await compare(userData.password, findUser.password);
     const success = isPasswordMatching;
 
-    // 4️⃣ Enregistrer la tentative de connexion
 
     // 5️⃣ Gestion des échecs
     if (!success) {
@@ -173,8 +275,7 @@ export class AuthService {
     if (existingSession) {
       // Renouvelle le refresh token
       refreshTokenData = createRefreshToken(findUser);
-      const refreshHash = await hash(refreshTokenData.token, 10);
-
+      
       await this.prisma.session.update({
         where: { id: existingSession.id },
         data: {
@@ -225,11 +326,6 @@ export class AuthService {
 
     // 1️⃣1️⃣ Créer un cookie HTTPOnly avec le Refresh Token
     const cookie = createCookie(refreshTokenData);
-
-    // 1️⃣2️⃣ Historiser la connexion
-    await this.prisma.loginHistory.create({
-      data: { user: { connect: { id: findUser.id } } },
-    });
 
     return { cookie, findUser, accessToken: accessTokenData.token };
   }
@@ -296,10 +392,46 @@ export class AuthService {
       accessToken: newAccessTokenData.token,
     };
   }
-  public async logout(idData: string): Promise<User> {
-    const findUser: User = await this.users.findFirst({ where: { id: idData } });
+  public async logout(idData: string, ipData: string, userAgentData: string): Promise<{ findUser: User; findSession: Session }> {
+    const findUser: User = await this.users.findFirst({
+      where: {
+        id: idData,
+      },
+    });
     if (!findUser) throw new HttpException(409, "User doesn't exist");
 
-    return findUser;
+    const findSession: Session = await this.prisma.session.findFirst({
+      where: {
+        ipAddress: ipData,
+        userAgent: userAgentData,
+        userId: findUser.id,
+      },
+    });
+
+    if (!findSession) throw new HttpException(409, "Session doesn't exist or already revoked");
+
+    await this.prisma.session.update({
+      where: { id: findSession.id },
+      data: { isRevoked: true },
+    });
+
+    return { findUser, findSession };
+  }
+
+  public async logoutAllSessions(userId: string): Promise<{ revokedCount: number }> {
+    const findUser = await this.users.findFirst({ where: { id: userId } });
+    if (!findUser) throw new HttpException(404, "User doesn't exist");
+
+    const result = await this.prisma.session.updateMany({
+      where: {
+        userId,
+        isRevoked: false,
+      },
+      data: {
+        isRevoked: true,
+      },
+    });
+
+    return { revokedCount: result.count };
   }
 }

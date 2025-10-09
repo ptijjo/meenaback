@@ -5,7 +5,7 @@ import { User } from "../interfaces/users.interface";
 import { v4 as uuidv4 } from "uuid";
 
 
-interface RefreshTokenData {
+export interface RefreshTokenData {
   jti: string;
   token: string;
   expiresIn: number;

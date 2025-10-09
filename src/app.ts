@@ -10,9 +10,13 @@ import swaggerJSDoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 import http from 'http';
 import { Routes } from './interfaces/routes.interface';
-import { NODE_ENV, PORT, LOG_FORMAT, ORIGIN, CREDENTIALS } from './config';
+import { NODE_ENV, PORT, LOG_FORMAT, ORIGIN, CREDENTIALS, SESSION_SECRET } from './config';
 import { ErrorMiddleware } from './middlewares/error.middleware';
-import { logger,stream } from './utils/logger';
+import { logger, stream } from './utils/logger';
+import session from 'express-session';
+import passport from 'passport';
+import "./middlewares/oauth.middleware";
+
 
 type MorganFormat = 'dev' | 'combined';
 const LOG_FORMAT_MORGAN: MorganFormat = (LOG_FORMAT as MorganFormat) || 'dev';
@@ -58,6 +62,26 @@ export class App {
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
     this.app.use(cookieParser());
+
+    // Session
+    this.app.use(
+      session({
+        secret: SESSION_SECRET,
+        resave: false,
+        saveUninitialized: true,
+        cookie: {
+          secure: false,
+          sameSite: 'lax',
+          //httpOnly: true,
+          //maxAge: 1000 * 60 * 60 * 24 * 7, // 7 jours
+        }
+      }),
+    );
+
+    // Passport
+    this.app.use(passport.initialize());
+    this.app.use(passport.session());
+
   }
 
   private initializeRoutes(routes: Routes[]) {
