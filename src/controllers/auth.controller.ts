@@ -9,8 +9,8 @@ import { CreateAuthDto } from '../dtos/auth.dto';
 import { ORIGIN } from '../config';
 
 export class AuthController {
-  public auth = Container.get(AuthService);
-  public user = Container.get(UserService);
+  private auth = Container.get(AuthService);
+  private user = Container.get(UserService);
 
   public signUp = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {

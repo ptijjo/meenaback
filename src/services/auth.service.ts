@@ -1,4 +1,4 @@
-import { PrismaClient, User } from '@prisma/client';
+import { User } from '@prisma/client';
 import { compare, hash } from 'bcrypt';
 import Container, { Service } from 'typedi';
 import { CreateUserDto } from '../dtos/users.dto';
@@ -19,12 +19,13 @@ import { randomBytes } from 'crypto';
 import { MailService } from './mails.service';
 import { Session } from '../interfaces/session.interface';
 import { v4 as uuidv4 } from 'uuid';
-import { TokenData } from '../interfaces/auth.interface';
+import prisma from '../utils/prisma';
+import { generateId } from '../utils/generateId';
 
 @Service()
 export class AuthService {
-  public users = new PrismaClient().user;
-  public prisma = new PrismaClient();
+  public users = prisma.user;
+  public prisma = prisma;
   public mailService = Container.get(MailService);
 
   public async signup(userData: CreateUserDto): Promise<User> {
@@ -55,6 +56,7 @@ export class AuthService {
       data: {
         name: createUserData.secretName,
         user: { connect: { id: createUserData.id } },
+        invitId: generateId(9),
       },
     });
 

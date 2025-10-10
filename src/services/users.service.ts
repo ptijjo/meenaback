@@ -1,14 +1,14 @@
-import { PrismaClient } from '@prisma/client';
 import { hash } from 'bcrypt';
 import { Service } from 'typedi';
 import { User } from '../interfaces/users.interface';
 import { HttpException } from '../exceptions/httpException';
 import { CreateUserDto } from '../dtos/users.dto';
+import prisma from '../utils/prisma';
 
 
 @Service()
 export class UserService {
-  public user = new PrismaClient().user;
+  public user = prisma.user;
 
   public async findAllUser(): Promise<User[]> {
     const allUser: User[] = await this.user.findMany();

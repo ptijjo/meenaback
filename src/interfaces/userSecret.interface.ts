@@ -1,4 +1,5 @@
 export interface UserSecret{
-    userid: string;
+    userId: string;
     name: string;
+    invitId: string;
 }
