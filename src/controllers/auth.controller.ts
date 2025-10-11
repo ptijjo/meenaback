@@ -1,4 +1,3 @@
-import { User } from '@prisma/client';
 import { NextFunction, Request, Response } from 'express';
 import { Container } from 'typedi';
 import { RequestWithUser } from '../interfaces/auth.interface';
@@ -6,8 +5,11 @@ import { AuthService } from '../services/auth.service';
 import passport from 'passport';
 import { UserService } from '../services/users.service';
 import { CreateAuthDto } from '../dtos/auth.dto';
-import { ORIGIN } from '../config';
+import { ORIGIN, REFRESH_TOKEN_SECRET } from '../config';
 import { HttpException } from '../exceptions/httpException';
+import { User } from '../interfaces/users.interface';
+import { verify } from 'jsonwebtoken';
+import { createAccessToken, createRefreshToken } from '../utils/tokens';
 
 export class AuthController {
   private auth = Container.get(AuthService);
@@ -51,9 +53,12 @@ export class AuthController {
       if (!refreshToken) throw new HttpException(400, 'No refresh token provided');
 
       await this.auth.logout(refreshToken);
-      
+
       // Supprimer les cookies
-      res.setHeader('Set-Cookie', ['Authorization=; Max-age=0; HttpOnly; Secure; SameSite=Strict','RefreshToken=; Max-Age=0; HttpOnly; Secure; SameSite=Strict']);
+      res.setHeader('Set-Cookie', [
+        'Authorization=; Max-age=0; HttpOnly; Secure; SameSite=Strict',
+        'RefreshToken=; Max-Age=0; HttpOnly; Secure; SameSite=Strict',
+      ]);
       res.status(200).json({ message: 'user logout sucessfully' });
     } catch (error) {
       next(error);
@@ -66,7 +71,11 @@ export class AuthController {
 
       const revoked = await this.auth.logoutAllSessions(id);
 
-      res.setHeader('Set-Cookie', ['Authorization=; Max-Age=0; HttpOnly; Secure; SameSite=Strict',,'RefreshToken=; Max-Age=0; HttpOnly; Secure; SameSite=Strict']);
+      res.setHeader('Set-Cookie', [
+        'Authorization=; Max-Age=0; HttpOnly; Secure; SameSite=Strict',
+        ,
+        'RefreshToken=; Max-Age=0; HttpOnly; Secure; SameSite=Strict',
+      ]);
 
       res.status(200).json({
         message: `All sessions revoked successfully`,
@@ -74,6 +83,50 @@ export class AuthController {
       });
     } catch (error) {
       next(error);
+    }
+  };
+
+  public decodeToken = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
+    if (!req.user || !req.user.id) {
+      res.status(401).json({ message: 'Unauthorized: no valid token' });
+    }
+
+    const user: User = await this.user.findUserById(req.user.id);
+
+    if (!user) {
+      res.status(404).json({ message: 'User not found' });
+    }
+
+    res.status(200).json(user);
+  };
+
+  public refreshToken = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const token = req.cookies.refreshToken;
+      if (!token) res.sendStatus(401); // pas de token → non autorisé
+
+      const payload: any = verify(token, REFRESH_TOKEN_SECRET);
+
+      // 🔹 Récupérer l'utilisateur complet depuis la DB
+      const userService = new UserService();
+      const user = await userService.findUserById(payload.id);
+      if (!user) res.sendStatus(404);
+
+      // Générer tokens
+      const accessToken = createAccessToken(user).token;
+      const refreshTokenData = createRefreshToken(user);
+
+      // Remettre le refresh token en cookie
+      res.cookie('refreshToken', refreshTokenData.token, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        maxAge: refreshTokenData.expiresIn * 1000,
+      });
+      res.json({ accessToken });
+    } catch (error) {
+      console.error(error);
+      res.sendStatus(403); // token invalide
     }
   };
 
@@ -97,6 +150,7 @@ export class AuthController {
         if (err) {
           return next(err);
         }
+
         try {
           const email = user.emails?.[0]?.value;
           const googleId = user.id;
@@ -106,10 +160,19 @@ export class AuthController {
           const authData: CreateAuthDto = { email, googleId };
 
           // 🔥 Utilisation de ton service d’auth
-          const { cookie, findUser, accessToken } = await this.auth.login(authData, ipAddress, userAgent);
+          const { cookie } = await this.auth.login(authData, ipAddress, userAgent);
+
+          // ✅ Ajout des cookies manquants
+          // Poser le cookie déjà créé par login()
+          res.cookie('Authorization', cookie.split('=')[1]?.split(';')[0], {
+            httpOnly: true,
+            secure: false, // mettre true en prod si HTTPS
+            maxAge: 3600 * 1000 * 24, // 24h
+            sameSite: 'lax',
+          });
 
           // ✅ Redirection vers ton frontend avec token ou juste succès
-          return res.redirect(ORIGIN + `/dashboard/${accessToken}`);
+          return res.redirect(ORIGIN + `/dashboard`);
         } catch (error) {
           console.error('Erreur dans googleAuthCallback:', error);
           return res.redirect(ORIGIN);

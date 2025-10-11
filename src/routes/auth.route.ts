@@ -21,6 +21,9 @@ export class AuthRoute implements Routes {
     this.router.get(`${this.path}verify-email/:token`, this.auth.verifyEmail);
     this.router.post(`${this.path}login`, ValidationMiddleware(CreateAuthDto), authRateLimiter, this.auth.logIn);
     this.router.get(`${this.path}logout`, AuthMiddleware, this.auth.logOut);
+    this.router.get(`${this.path}logoutAll`, AuthMiddleware, this.auth.logOutAll);
+    this.router.get(`${this.path}connected`, AuthMiddleware, this.auth.decodeToken);
+    
 
     //oauth Googole
     this.router.get(`${this.path}`, this.auth.homeOauth);
