@@ -7,6 +7,7 @@ import passport from 'passport';
 import { UserService } from '../services/users.service';
 import { CreateAuthDto } from '../dtos/auth.dto';
 import { ORIGIN } from '../config';
+import { HttpException } from '../exceptions/httpException';
 
 export class AuthController {
   private auth = Container.get(AuthService);
@@ -46,14 +47,14 @@ export class AuthController {
 
   public logOut = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const id: string = req.user.id;
-      const ipAddress = String(req.ip);
-      const userAgent = String(req.headers['user-agent']);
+      const refreshToken = req.cookies?.RefreshToken;
+      if (!refreshToken) throw new HttpException(400, 'No refresh token provided');
 
-      const logOutUserData = await this.auth.logout(id, ipAddress, userAgent);
-
-      res.setHeader('Set-Cookie', ['Authorization=; Max-age=0; HttpOnly; Secure; SameSite=Strict']);
-      res.status(200).json({ data: logOutUserData, message: 'user logout sucessfully' });
+      await this.auth.logout(refreshToken);
+      
+      // Supprimer les cookies
+      res.setHeader('Set-Cookie', ['Authorization=; Max-age=0; HttpOnly; Secure; SameSite=Strict','RefreshToken=; Max-Age=0; HttpOnly; Secure; SameSite=Strict']);
+      res.status(200).json({ message: 'user logout sucessfully' });
     } catch (error) {
       next(error);
     }
@@ -65,7 +66,7 @@ export class AuthController {
 
       const revoked = await this.auth.logoutAllSessions(id);
 
-      res.setHeader('Set-Cookie', ['Authorization=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Strict']);
+      res.setHeader('Set-Cookie', ['Authorization=; Max-Age=0; HttpOnly; Secure; SameSite=Strict',,'RefreshToken=; Max-Age=0; HttpOnly; Secure; SameSite=Strict']);
 
       res.status(200).json({
         message: `All sessions revoked successfully`,

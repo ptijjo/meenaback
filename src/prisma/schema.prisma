@@ -97,9 +97,9 @@ model User {
 // 🔐 AUTH RELATIONS
 // ======================================
 model userSecret {
-  userId String @id
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name   String
+  userId  String @id
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name    String
   invitId String @unique
 }
 
@@ -107,27 +107,27 @@ model LoginHistory {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
   userId    String
-  user      User     @relation(fields: [userId], references: [id],onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Session {
-  id           String   @id @default(cuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id],onDelete: Cascade)
-  jti           String   @unique // identifiant unique du refresh token (JWT ID)
-  userAgent    String
-  ipAddress    String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  expiresAt    DateTime
-  isRevoked    Boolean  @default(false)
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jti       String   @unique // identifiant unique du refresh token (JWT ID)
+  userAgent String
+  ipAddress String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  expiresAt DateTime
+  isRevoked Boolean  @default(false)
+  revokedAt   DateTime?
 }
-
 
 model LoginAttempts {
   id        String   @id @default(cuid())
   emailName String
-  email     User     @relation(fields: [emailName], references: [email],onDelete: Cascade)
+  email     User     @relation(fields: [emailName], references: [email], onDelete: Cascade)
   success   Boolean
   ipAddress String
   createdAt DateTime @default(now())

@@ -13,6 +13,7 @@ export interface TokenData {
 
 export interface RequestWithUser extends Request {
   user: User;
+  jti: string;
   logIn: any;
   isAuthenticated?: any;
 }

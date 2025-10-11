@@ -122,8 +122,16 @@ export class AuthService {
           data: {
             email: userData.email,
             googleId: userData.googleId,
-            secretName: `user` + String(uuidv4()),
+            secretName: `user` + generateId(7),
             isVerified: true,
+          },
+        });
+
+        await this.prisma.userSecret.create({
+          data: {
+            name: findUser.secretName,
+            user: { connect: { id: findUser.id } },
+            invitId: generateId(9),
           },
         });
       }
@@ -220,7 +228,6 @@ export class AuthService {
     const isPasswordMatching = await compare(userData.password, findUser.password);
     const success = isPasswordMatching;
 
-
     // 5️⃣ Gestion des échecs
     if (!success) {
       await this.prisma.loginAttempts.create({
@@ -277,7 +284,7 @@ export class AuthService {
     if (existingSession) {
       // Renouvelle le refresh token
       refreshTokenData = createRefreshToken(findUser);
-      
+
       await this.prisma.session.update({
         where: { id: existingSession.id },
         data: {
@@ -304,7 +311,6 @@ export class AuthService {
 
       // Crée une nouvelle session
       refreshTokenData = createRefreshToken(findUser);
-      const refreshHash = await hash(refreshTokenData.token, 10);
 
       await this.prisma.session.create({
         data: {
@@ -394,36 +400,39 @@ export class AuthService {
       accessToken: newAccessTokenData.token,
     };
   }
-  public async logout(idData: string, ipData: string, userAgentData: string): Promise<{ findUser: User; findSession: Session }> {
-    const findUser: User = await this.users.findFirst({
-      where: {
-        id: idData,
-      },
-    });
-    if (!findUser) throw new HttpException(409, "User doesn't exist");
+  public async logout(refreshToken: string): Promise<{ revoked: boolean }> {
+    try {
+      // 1️⃣ Vérifier que le token existe
+      if (!refreshToken) throw new HttpException(400, 'No refresh token provided');
 
-    const findSession: Session = await this.prisma.session.findFirst({
-      where: {
-        ipAddress: ipData,
-        userAgent: userAgentData,
-        userId: findUser.id,
-      },
-    });
+      // 2️⃣ Vérifier la validité du token
+      const decoded = verify(refreshToken, REFRESH_TOKEN_SECRET) as { id: string; jti: string };
+      if (!decoded || !decoded.jti) throw new HttpException(400, 'Invalid token');
 
-    if (!findSession) throw new HttpException(409, "Session doesn't exist or already revoked");
+      // 3️⃣ Trouver la session correspondante
+      const session = await this.prisma.session.findUnique({
+        where: { jti: decoded.jti },
+      });
 
-    await this.prisma.session.update({
-      where: { id: findSession.id },
-      data: { isRevoked: true },
-    });
+      if (!session) throw new HttpException(404, 'Session not found');
 
-    return { findUser, findSession };
+      // 4️⃣ Révoquer la session
+      await this.prisma.session.update({
+        where: { jti: decoded.jti },
+        data: { isRevoked: true, revokedAt: new Date() },
+      });
+
+      return { revoked: true };
+    } catch (error) {
+      throw new HttpException(401, 'Invalid or expired refresh token');
+    }
   }
 
   public async logoutAllSessions(userId: string): Promise<{ revokedCount: number }> {
     const findUser = await this.users.findFirst({ where: { id: userId } });
     if (!findUser) throw new HttpException(404, "User doesn't exist");
 
+    // 2️⃣ Révoque toutes les sessions actives (non révoquées)
     const result = await this.prisma.session.updateMany({
       where: {
         userId,
@@ -431,6 +440,7 @@ export class AuthService {
       },
       data: {
         isRevoked: true,
+        revokedAt: new Date(),
       },
     });
 
