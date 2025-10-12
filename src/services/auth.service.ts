@@ -339,6 +339,7 @@ export class AuthService {
   }
 
   public async refreshToken(oldRefreshToken: string, ipAddress: string, userAgent: string): Promise<{ cookie: string; accessToken: string }> {
+  
     let decoded: any;
     try {
       decoded = verify(oldRefreshToken, REFRESH_TOKEN_SECRET);
@@ -346,11 +347,9 @@ export class AuthService {
       throw new HttpException(401, 'Refresh token invalide');
     }
 
-    const { jti } = decoded;
-
     // 1️⃣ Rechercher la session via la JTI (et user)
     const session = await this.prisma.session.findUnique({
-      where: { jti },
+      where: {jti: decoded.jti } ,
       include: { user: true },
     });
 

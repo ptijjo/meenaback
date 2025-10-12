@@ -6,6 +6,7 @@ import { HttpException } from '../exceptions/httpException';
 import { RequestWithUser, DataStoredInToken } from '../interfaces/auth.interface';
 
 
+
 const getAuthorization = (req) => {
   // const coockie = req.cookies['Authorization'];
   // if (coockie) return coockie;
@@ -21,9 +22,11 @@ export const AuthMiddleware = async (req: RequestWithUser, res: Response, next: 
     const Authorization = getAuthorization(req);
 
     if (Authorization) {
-      const { id } = (await verify(Authorization, SECRET_KEY)) as DataStoredInToken;
+
+      const decoded = verify(Authorization, SECRET_KEY as string) as DataStoredInToken;
+      console.log("on décode le refreshtoken : ",decoded)
       const users = new PrismaClient().user;
-      const findUser = await users.findUnique({ where: { id: String(id) } });
+      const findUser = await users.findUnique({ where: { id: String(decoded.id) } });
 
       if (findUser) {
         req.user = findUser;
@@ -35,6 +38,7 @@ export const AuthMiddleware = async (req: RequestWithUser, res: Response, next: 
       next(new HttpException(401, 'Authentication token missing'));
     }
   } catch (error) {
+    console.error("JWT Verification Error:", error.name, error.message);
     next(new HttpException(401, 'Wrong authentication token'));
   }
 };

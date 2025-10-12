@@ -10,7 +10,7 @@ import swaggerJSDoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 import http from 'http';
 import { Routes } from './interfaces/routes.interface';
-import { NODE_ENV, PORT, LOG_FORMAT, ORIGIN, CREDENTIALS, SESSION_SECRET } from './config';
+import { NODE_ENV, PORT, LOG_FORMAT, ORIGIN, CREDENTIALS, SESSION_SECRET, SECRET_KEY } from './config';
 import { ErrorMiddleware } from './middlewares/error.middleware';
 import { logger, stream } from './utils/logger';
 import session from 'express-session';
@@ -66,7 +66,7 @@ export class App {
     res.header('Access-Control-Allow-Credentials', 'true'); // Souvent requis par certains navigateurs
     res.header('Access-Control-Allow-Origin', ORIGIN); // Répétition de l'origine
     // Si la redirection posait problème, vous pouvez essayer d'exposer les headers
-    // res.header('Access-Control-Expose-Headers', 'Set-Cookie'); // Parfois utile
+      // res.header('Access-Control-Expose-Headers', 'Set-Cookie'); // Parfois utile
     next();
 });
 

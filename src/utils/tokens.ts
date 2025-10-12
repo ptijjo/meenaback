@@ -16,7 +16,7 @@ export interface RefreshTokenData {
 export const createAccessToken =(user: User) : TokenData =>{
     
     const dataStoredInToken: DataStoredInToken = { id: user.id };
-    const secretKey: string = ACCESS_SECRET_KEY;
+    const secretKey: string = SECRET_KEY;
     const expiresIn: number = ACCESS_TOKEN_EXPIRES_IN as unknown as number;
 
     return { expiresIn, token: sign(dataStoredInToken, secretKey, { expiresIn }) };

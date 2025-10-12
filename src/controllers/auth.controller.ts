@@ -105,7 +105,6 @@ export class AuthController {
       const oldRefreshToken = req.cookies.refreshToken;
       if (!oldRefreshToken) {
         res.sendStatus(401);
-        return;
       }
 
       const ipAddress = req.ip;
@@ -123,7 +122,7 @@ export class AuthController {
       console.error('Erreur refresh :', error);
       // Si c'est une HttpException, utiliser son statut, sinon 401
       const status = error instanceof HttpException ? error.status : 401;
-       res.sendStatus(status); // Utilisez 401 si le token est rejeté
+      res.sendStatus(status); // Utilisez 401 si le token est rejeté
     }
   };
 
