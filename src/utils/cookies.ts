@@ -13,7 +13,7 @@ export const createCookie = (refreshTokenData: TokenData): string => {
 
     if (isProduction) {
         // Ces attributs sont OBLIGATOIRES pour les cookies Cross-Site en HTTPS
-        cookieString += '; Secure; SameSite=Strict'; 
+        cookieString += '; Secure; SameSite=Lax'; 
     } else {
         // Gardez 'SameSite=Lax' ou ne mettez rien en dev HTTP
         cookieString += '; SameSite=Lax'; 

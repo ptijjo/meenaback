@@ -7,8 +7,8 @@ import { RequestWithUser, DataStoredInToken } from '../interfaces/auth.interface
 
 
 const getAuthorization = (req) => {
-  const coockie = req.cookies['Authorization'];
-  if (coockie) return coockie;
+  // const coockie = req.cookies['Authorization'];
+  // if (coockie) return coockie;
 
   const header = req.header('Authorization');
   if (header) return header.split('Bearer ')[1];
@@ -32,7 +32,7 @@ export const AuthMiddleware = async (req: RequestWithUser, res: Response, next: 
         next(new HttpException(401, 'Wrong authentication token'));
       }
     } else {
-      next(new HttpException(404, 'Authentication token missing'));
+      next(new HttpException(401, 'Authentication token missing'));
     }
   } catch (error) {
     next(new HttpException(401, 'Wrong authentication token'));

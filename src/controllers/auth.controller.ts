@@ -121,7 +121,9 @@ export class AuthController {
       res.status(200).json({ accessToken });
     } catch (error) {
       console.error('Erreur refresh :', error);
-      res.sendStatus(403);
+      // Si c'est une HttpException, utiliser son statut, sinon 401
+      const status = error instanceof HttpException ? error.status : 401;
+       res.sendStatus(status); // Utilisez 401 si le token est rejeté
     }
   };
 

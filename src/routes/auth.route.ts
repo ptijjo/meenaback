@@ -6,6 +6,7 @@ import { AuthMiddleware } from '../middlewares/auth.middleware';
 import { ValidationMiddleware } from '../middlewares/validation.middleware';
 import { authRateLimiter } from '../middlewares/rateLimit.middleware';
 import { CreateAuthDto } from '../dtos/auth.dto';
+import { RefreshTokenMiddleware } from '../middlewares/refreshToken.middleware';
 
 export class AuthRoute implements Routes {
   public path = '/';
@@ -23,7 +24,7 @@ export class AuthRoute implements Routes {
     this.router.get(`${this.path}logout`, AuthMiddleware, this.auth.logOut);
     this.router.get(`${this.path}logoutAll`, AuthMiddleware, this.auth.logOutAll);
     this.router.get(`${this.path}connected`, AuthMiddleware, this.auth.decodeToken);
-    this.router.post(`${this.path}refresh`, AuthMiddleware, this.auth.refreshToken);
+    this.router.post(`${this.path}refresh`, RefreshTokenMiddleware, this.auth.refreshToken);
     
 
     //oauth Googole
