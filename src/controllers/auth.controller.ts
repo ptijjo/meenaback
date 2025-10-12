@@ -38,10 +38,10 @@ export class AuthController {
       const ipAddress = String(req.ip || 'unknown');
       const userAgent = String(req.headers['user-agent'] || 'unknown');
 
-      const { cookie, findUser } = await this.auth.login(userData, ipAddress, userAgent);
+      const { cookie, accessToken } = await this.auth.login(userData, ipAddress, userAgent);
 
       res.setHeader('Set-Cookie', [cookie]);
-      res.status(200).json({ data: findUser, message: 'login' });
+      res.status(200).json({ data: accessToken, message: 'login' });
     } catch (error) {
       next(error);
     }
@@ -102,31 +102,26 @@ export class AuthController {
 
   public refreshToken = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const token = req.cookies.refreshToken;
-      if (!token) res.sendStatus(401); // pas de token → non autorisé
+      const oldRefreshToken = req.cookies.refreshToken;
+      if (!oldRefreshToken) {
+        res.sendStatus(401);
+        return;
+      }
 
-      const payload: any = verify(token, REFRESH_TOKEN_SECRET);
+      const ipAddress = req.ip;
+      const userAgent = req.get('User-Agent') || 'Unknown';
 
-      // 🔹 Récupérer l'utilisateur complet depuis la DB
-      const userService = new UserService();
-      const user = await userService.findUserById(payload.id);
-      if (!user) res.sendStatus(404);
+      // 🧠 Appel au service
+      const { cookie, accessToken } = await this.auth.refreshToken(oldRefreshToken, ipAddress, userAgent);
 
-      // Générer tokens
-      const accessToken = createAccessToken(user).token;
-      const refreshTokenData = createRefreshToken(user);
+      // 🍪 Nouveau cookie avec le refresh token
+      res.setHeader('Set-Cookie', [cookie]);
 
-      // Remettre le refresh token en cookie
-      res.cookie('refreshToken', refreshTokenData.token, {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'lax',
-        maxAge: refreshTokenData.expiresIn * 1000,
-      });
-      res.json({ accessToken });
+      // 📤 Renvoi du nouvel access token (le front Redux va le stocker)
+      res.status(200).json({ accessToken });
     } catch (error) {
-      console.error(error);
-      res.sendStatus(403); // token invalide
+      console.error('Erreur refresh :', error);
+      res.sendStatus(403);
     }
   };
 
@@ -160,22 +155,18 @@ export class AuthController {
           const authData: CreateAuthDto = { email, googleId };
 
           // 🔥 Utilisation de ton service d’auth
-          const { cookie } = await this.auth.login(authData, ipAddress, userAgent);
+          const { cookie, accessToken } = await this.auth.login(authData, ipAddress, userAgent);
 
           // ✅ Ajout des cookies manquants
-          // Poser le cookie déjà créé par login()
-          res.cookie('Authorization', cookie.split('=')[1]?.split(';')[0], {
-            httpOnly: true,
-            secure: false, // mettre true en prod si HTTPS
-            maxAge: 3600 * 1000 * 24, // 24h
-            sameSite: 'lax',
-          });
 
-          // ✅ Redirection vers ton frontend avec token ou juste succès
-          return res.redirect(ORIGIN + `/dashboard`);
+          res.setHeader('Set-Cookie', cookie);
+
+          // ✅ Réponse 200 avec les données nécessaires au front-end
+          const finalRedirectUrl = `${ORIGIN}/auth/callback#access_token=${accessToken}`;
+          return res.redirect(finalRedirectUrl);
         } catch (error) {
           console.error('Erreur dans googleAuthCallback:', error);
-          return res.redirect(ORIGIN);
+          return res.status(401).json({ error: 'Échec de la création de session' });
         }
       });
     })(req, res, next);

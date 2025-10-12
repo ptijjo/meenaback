@@ -33,3 +33,7 @@ export const createRefreshToken = (user: User): RefreshTokenData => {
     token: sign(payload, secret, { expiresIn }),
   };
 }
+
+export const createCookie = (refreshTokenData: RefreshTokenData): string => {
+  return `refreshToken=${refreshTokenData.token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${refreshTokenData.expiresIn}`;
+};

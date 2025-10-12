@@ -346,7 +346,7 @@ export class AuthService {
       throw new HttpException(401, 'Refresh token invalide');
     }
 
-    const { id: userId, jti } = decoded;
+    const { jti } = decoded;
 
     // 1️⃣ Rechercher la session via la JTI (et user)
     const session = await this.prisma.session.findUnique({
@@ -367,19 +367,12 @@ export class AuthService {
       throw new HttpException(401, 'Session expirée, veuillez vous reconnecter');
     }
 
-    // 3️⃣ Comparer le token reçu avec le hash stocké
-    // const isMatch = await compare(oldRefreshToken, session.refreshToken);
-    // if (!isMatch) {
-    //   throw new HttpException(401, 'Refresh token non reconnu');
-    // }
 
     const user = session.user;
 
     // 4️⃣ Générer un NOUVEAU access token + refresh token
     const newAccessTokenData = createAccessToken(user);
     const newRefreshTokenData = createRefreshToken(user);
-    //const newRefreshHash = await hash(newRefreshTokenData.token, 10);
-    const newJti = newRefreshTokenData.jti;
 
     // 5️⃣ Mettre à jour la session avec le NOUVEAU Jti
     await this.prisma.session.update({
@@ -400,6 +393,7 @@ export class AuthService {
       accessToken: newAccessTokenData.token,
     };
   }
+
   public async logout(refreshToken: string): Promise<{ revoked: boolean }> {
     try {
       // 1️⃣ Vérifier que le token existe

@@ -62,6 +62,13 @@ export class App {
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
     this.app.use(cookieParser());
+    this.app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Credentials', 'true'); // Souvent requis par certains navigateurs
+    res.header('Access-Control-Allow-Origin', ORIGIN); // Répétition de l'origine
+    // Si la redirection posait problème, vous pouvez essayer d'exposer les headers
+    // res.header('Access-Control-Expose-Headers', 'Set-Cookie'); // Parfois utile
+    next();
+});
 
     // Session
     this.app.use(
