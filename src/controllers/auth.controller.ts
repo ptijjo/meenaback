@@ -49,7 +49,7 @@ export class AuthController {
 
   public logOut = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const refreshToken = req.cookies?.RefreshToken;
+      const refreshToken = req.cookies?.refreshToken;
       if (!refreshToken) throw new HttpException(400, 'No refresh token provided');
 
       await this.auth.logout(refreshToken);
@@ -57,7 +57,7 @@ export class AuthController {
       // Supprimer les cookies
       res.setHeader('Set-Cookie', [
         'Authorization=; Max-age=0; HttpOnly; Secure; SameSite=Strict',
-        'RefreshToken=; Max-Age=0; HttpOnly; Secure; SameSite=Strict',
+        'refreshToken=; Max-Age=0; HttpOnly; Secure; SameSite=Strict',
       ]);
       res.status(200).json({ message: 'user logout sucessfully' });
     } catch (error) {
