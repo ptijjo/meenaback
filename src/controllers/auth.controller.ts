@@ -10,6 +10,7 @@ import { HttpException } from '../exceptions/httpException';
 import { User } from '../interfaces/users.interface';
 import { verify } from 'jsonwebtoken';
 import { createAccessToken, createRefreshToken } from '../utils/tokens';
+import { cacheService } from '../server';
 
 export class AuthController {
   private auth = Container.get(AuthService);
@@ -49,6 +50,10 @@ export class AuthController {
 
   public logOut = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
     try {
+      const userId = req.user.id; // Récupère l'ID via le AuthMiddleware
+      // 1. Suppression ciblée dans Redis
+      await cacheService.del(`auth:${userId}`);
+
       const refreshToken = req.cookies?.refreshToken;
       if (!refreshToken) throw new HttpException(400, 'No refresh token provided');
 
@@ -86,18 +91,33 @@ export class AuthController {
     }
   };
 
-  public decodeToken = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
+  public whoIsLog = async (req: RequestWithUser, res: Response, next: NextFunction) => {
     if (!req.user || !req.user.id) {
-      res.status(401).json({ message: 'Unauthorized: no valid token' });
+     return res.status(401).json({ message: 'Unauthorized: no valid token' });
     }
+    const userId = req.user.id;
+    const cacheKey = `auth:${userId}`;
+    try {
+      // 1. Essayer de récupérer le profil complet du cache
+      const cachedUser = await cacheService.get(cacheKey);
 
-    const user: User = await this.user.findUserById(req.user.id);
+      if (cachedUser) {
+       return res.status(200).json(cachedUser); // Cache Hit : Retour immédiat
+      }
 
-    if (!user) {
-      res.status(404).json({ message: 'User not found' });
+      // 2. Cache Miss : Aller chercher dans la DB
+      const user: User = await this.user.findUserById(req.user.id);
+
+      if (user) {
+        // 3. Mettre à jour le cache et retourner
+        await cacheService.set(cacheKey, user, 3600);
+       return res.status(200).json(user);
+      }
+
+      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    } catch (error) {
+      next(error);
     }
-
-    res.status(200).json(user);
   };
 
   public refreshToken = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {

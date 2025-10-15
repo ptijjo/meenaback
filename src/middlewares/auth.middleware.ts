@@ -1,44 +1,59 @@
-import { PrismaClient } from '@prisma/client';
 import { NextFunction, Response } from 'express';
 import { verify } from 'jsonwebtoken';
-import { SECRET_KEY } from '../config';
+import { ACCESS_TOKEN_EXPIRES_IN, SECRET_KEY } from '../config';
 import { HttpException } from '../exceptions/httpException';
 import { RequestWithUser, DataStoredInToken } from '../interfaces/auth.interface';
+import { cacheService } from '../server';
+import prisma from '../utils/prisma';
 
+// Calcule la durée de vie du cache une seule fois
+const CACHE_TTL: number = Number(ACCESS_TOKEN_EXPIRES_IN);
 
-
-const getAuthorization = (req) => {
-  // const coockie = req.cookies['Authorization'];
-  // if (coockie) return coockie;
-
+const getAuthorization = req => {
   const header = req.header('Authorization');
   if (header) return header.split('Bearer ')[1];
-
   return null;
-}
+};
 
 export const AuthMiddleware = async (req: RequestWithUser, res: Response, next: NextFunction) => {
   try {
     const Authorization = getAuthorization(req);
 
-    if (Authorization) {
+    if (!Authorization) {
+      return next(new HttpException(401, 'Authentication token missing'));
+    }
+    
+    // 1. Décode le JWT pour obtenir l'ID (cela gère les erreurs de signature/expiration)
+    const decoded = verify(Authorization, SECRET_KEY as string) as DataStoredInToken;
+    const userId = decoded.id;
 
-      const decoded = verify(Authorization, SECRET_KEY as string) as DataStoredInToken;
-      console.log("on décode le refreshtoken : ",decoded)
-      const users = new PrismaClient().user;
-      const findUser = await users.findUnique({ where: { id: String(decoded.id) } });
+    // 2. Nouvelle clé de cache : basée sur l'ID utilisateur
+    // Note: Utiliser 'auth:' ou 'user:' est une convention. 'user:' est très clair.
+    const cacheKey = `user:${userId}`; 
 
-      if (findUser) {
-        req.user = findUser;
-        next();
-      } else {
-        next(new HttpException(401, 'Wrong authentication token'));
-      }
+    // 3. Cherche d’abord l’utilisateur dans Redis (Cache Hit)
+    const cachedUser = await cacheService.get(cacheKey);
+    if (cachedUser) {
+      req.user = cachedUser;
+      return next();
+    }
+
+    // 4. Récupère l’utilisateur depuis la DB (Cache Miss)
+    const findUser = await prisma.user.findUnique({ where: { id: String(userId) } });
+
+    if (findUser) {
+      // 5. Met l’utilisateur en cache
+      // console.log("le ttl de redis est : ", CACHE_TTL);
+      await cacheService.set(cacheKey, findUser, CACHE_TTL);
+
+      req.user = findUser;
+      return next();
     } else {
-      next(new HttpException(401, 'Authentication token missing'));
+      return next(new HttpException(401, 'Wrong authentication token'));
     }
   } catch (error) {
-    console.error("JWT Verification Error:", error.name, error.message);
-    next(new HttpException(401, 'Wrong authentication token'));
+    // Erreur lors du décodage (token expiré, signature invalide, etc.)
+    console.error('JWT Verification Error:', error.name, error.message);
+    return next(new HttpException(401, 'Wrong authentication token')); 
   }
 };

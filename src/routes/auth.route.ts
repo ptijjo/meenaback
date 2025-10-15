@@ -23,7 +23,7 @@ export class AuthRoute implements Routes {
     this.router.post(`${this.path}login`, ValidationMiddleware(CreateAuthDto), authRateLimiter, this.auth.logIn);
     this.router.get(`${this.path}logout`, AuthMiddleware, this.auth.logOut);
     this.router.get(`${this.path}logoutAll`, AuthMiddleware, this.auth.logOutAll);
-    this.router.get(`${this.path}connected`, AuthMiddleware, this.auth.decodeToken);
+    this.router.get(`${this.path}connected`, AuthMiddleware, this.auth.whoIsLog);
     this.router.post(`${this.path}refresh`, RefreshTokenMiddleware, this.auth.refreshToken);
     
 

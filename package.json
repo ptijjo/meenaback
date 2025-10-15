@@ -41,6 +41,7 @@
     "node-mailjet": "^6.0.9",
     "passport": "^0.7.0",
     "passport-google-oauth": "^2.0.0",
+    "redis": "^5.8.3",
     "reflect-metadata": "^0.2.2",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
