@@ -17,6 +17,7 @@ import session from 'express-session';
 import passport from 'passport';
 import './middlewares/oauth.middleware';
 import { createClient, RedisClientType } from 'redis';
+import path from 'path';
 
 type MorganFormat = 'dev' | 'combined';
 const LOG_FORMAT_MORGAN: MorganFormat = (LOG_FORMAT as MorganFormat) || 'dev';
@@ -59,6 +60,8 @@ export class App {
   }
 
   private initializeMiddlewares() {
+    this.app.set('trust proxy', 1);
+    this.app.use('/public', express.static(path.join(__dirname, '..', 'public')));
     this.app.use(morgan(LOG_FORMAT_MORGAN, { stream }));
     this.app.use(cors({ origin: ORIGIN, credentials: CREDENTIALS }));
     this.app.use(hpp());

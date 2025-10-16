@@ -17,8 +17,6 @@ import {
 import { verify } from 'jsonwebtoken';
 import { randomBytes } from 'crypto';
 import { MailService } from './mails.service';
-import { Session } from '../interfaces/session.interface';
-import { v4 as uuidv4 } from 'uuid';
 import prisma from '../utils/prisma';
 import { generateId } from '../utils/generateId';
 
@@ -100,6 +98,7 @@ export class AuthService {
     ipAddressData: string,
     userAgentData: string,
   ): Promise<{ cookie: string; findUser: User; accessToken: string }> {
+    
     //GoogleId present
     if (userData.googleId) {
       let findUser: User = await this.users.findUnique({ where: { googleId: userData.googleId } });

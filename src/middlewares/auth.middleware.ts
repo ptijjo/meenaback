@@ -33,6 +33,8 @@ export const AuthMiddleware = async (req: RequestWithUser, res: Response, next: 
 
     // 3. Cherche d’abord l’utilisateur dans Redis (Cache Hit)
     const cachedUser = await cacheService.get(cacheKey);
+
+    console.log("user dans le cache redis : ",cachedUser)
     if (cachedUser) {
       req.user = cachedUser;
       return next();

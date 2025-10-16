@@ -5,11 +5,9 @@ import { AuthService } from '../services/auth.service';
 import passport from 'passport';
 import { UserService } from '../services/users.service';
 import { CreateAuthDto } from '../dtos/auth.dto';
-import { ORIGIN, REFRESH_TOKEN_SECRET } from '../config';
+import { ORIGIN } from '../config';
 import { HttpException } from '../exceptions/httpException';
 import { User } from '../interfaces/users.interface';
-import { verify } from 'jsonwebtoken';
-import { createAccessToken, createRefreshToken } from '../utils/tokens';
 import { cacheService } from '../server';
 
 export class AuthController {

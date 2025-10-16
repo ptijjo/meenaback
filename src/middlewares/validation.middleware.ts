@@ -18,6 +18,7 @@ export const ValidationMiddleware = (type: any, skipMissingProperties = false, w
     validateOrReject(dto, { skipMissingProperties, whitelist, forbidNonWhitelisted })
       .then(() => {
         req.body = dto;
+        
         next();
       })
       .catch((errors: ValidationError[]) => {

@@ -79,7 +79,7 @@ model User {
   // Relations
   LoginHistory  LoginHistory[]
   Session       Session[]
-  userSecret    userSecret?
+  UserSecret    UserSecret?
   LoginAttempts LoginAttempts[]
 
   // Groupes & Chat
@@ -96,7 +96,7 @@ model User {
 // ======================================
 // 🔐 AUTH RELATIONS
 // ======================================
-model userSecret {
+model UserSecret {
   userId  String @id
   user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   name    String
