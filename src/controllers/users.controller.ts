@@ -30,7 +30,7 @@ export class UserController {
     }
   };
 
-  public updateUser = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
+  public updateUser = async (req: RequestWithUser, res: Response, next: NextFunction) => {
     try {
       const authorId = String(req.params.id);
       const userId = String(req.user.id);
@@ -41,15 +41,23 @@ export class UserController {
         throw new HttpException(404, 'Opération impossible');
       }
 
-      if (req.file && req.file.filename) {
-        const url = `${req.protocol}://${req.get('host')}/public/avatar/${req.file.filename}`;
-
-        userData.avatar = url;
+      if (!req.file && !userData.avatar) {
+       return res.status(400).json({ message: 'Aucun fichier envoyé' });
       }
 
+      if (req.file && req.file?.filename) {
+
+        delete (req.body as any).avatar;
+        
+        const url = `${req.protocol}://${req.get('host')}/public/avatar/${req.file.filename}`;
+        userData.avatar = url;
+        console.log("✅ Nouvel avatar reçu :", url);
+      }
+
+      console.log("🧠 Données envoyées au service :", userData);
       const updateUserData = await this.user.updateUser(authorId, userData);
 
-      res.status(200).json({ data: updateUserData, message: 'updated' });
+      return res.status(200).json({ data: updateUserData, message: 'updated' });
     } catch (error) {
       next(error);
     }
@@ -59,7 +67,7 @@ export class UserController {
     try {
       const userId = String(req.params.id);
       const auth = { id: req.user.id as string, role: req.user.role as string };
-      const deleteUserData: User = await this.user.deleteUser(userId,auth);
+      const deleteUserData: User = await this.user.deleteUser(userId, auth);
 
       res.status(200).json({ data: deleteUserData, message: 'deleted' });
     } catch (error) {

@@ -142,6 +142,7 @@ export class AuthService {
 
     // Crée une nouvelle session
     refreshTokenData = createRefreshToken(user);
+    
     await this.prisma.session.create({
       data: {
         user: { connect: { id: user.id } },

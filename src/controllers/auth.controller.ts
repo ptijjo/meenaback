@@ -62,6 +62,7 @@ export class AuthController {
       const userAgent = String(req.headers['user-agent'] || 'unknown');
       const { code, tempToken } = req.body;
       const result = await this.auth.loginWith2FA(code, tempToken, ipAddress, userAgent);
+   
 
       res.setHeader('Set-Cookie', [result.cookie]);
       res.status(200).json({ data: result.accessToken, message: 'login' });

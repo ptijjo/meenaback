@@ -63,27 +63,22 @@ export class UserService {
     // Gestion de l'avatar
     if (userData.avatar && findUser.avatar && userData.avatar !== findUser.avatar) {
       try {
-        let filePath: string;
+        const oldUrl = new URL(findUser.avatar);
 
-        // Extraction du chemin après le port (ex: "/public/avatar/...")
-        const relativePath = new URL(findUser.avatar).pathname;
+        // Si le fichier est hébergé sur ton propre serveur (localhost ou ton domaine)
+        if (oldUrl.hostname === 'localhost' || oldUrl.hostname === '127.0.0.1' || oldUrl.hostname === 'api.meena.cellulenoire.fr') {
+          const filePath = path.join(__dirname, '..', '..', oldUrl.pathname);
 
-        // Vérification si le chemin commence par "/avatar"
-        if (!relativePath.startsWith('/avatar')) {
-          // Si c'est pas /avatar, on remplace par /avatar/filename
-          const fileName = path.basename(relativePath);
-
-          filePath = path.join(__dirname, '..', '..', 'public', 'avatar', fileName);
+          console.log("🗑️ Suppression de l'ancien avatar :", filePath);
+          await safeDelete(filePath);
         } else {
-          // Sinon on construit le chemin local classique
-          filePath = path.join(__dirname, '..', '..', relativePath);
+          console.log('🌍 Ancien avatar hébergé à distance, suppression ignorée.');
         }
-
-        await safeDelete(filePath);
-      } catch (err) {
+      } catch (err: any) {
         if (err.code === 'ENOENT') {
-          throw new HttpException(409, `Fichier déjà supprimé ou introuvable : ${err.path}`);
+          console.warn(`⚠️ Fichier introuvable : ${err.path}`);
         } else {
+          console.error("❌ Erreur lors de la suppression de l'ancien avatar :", err);
           throw new HttpException(409, `Erreur lors de la suppression de l'ancien avatar : ${err}`);
         }
       }
@@ -103,6 +98,10 @@ export class UserService {
           twoFaSecret: null,
         },
       });
+    }
+
+    if (typeof userData.avatar !== 'string') {
+      delete userData.avatar; // Évite d'envoyer un objet
     }
 
     const updateUserData = await this.user.update({ where: { id: userId }, data: { ...userData } });
