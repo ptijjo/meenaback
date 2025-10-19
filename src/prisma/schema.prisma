@@ -103,16 +103,6 @@ model UserSecret {
   name    String
   invitId String @unique
 }
-
-model Pending2FA{
-  id          String   @id @default(cuid())
-  userId      String
-  ipAddress   String?
-  userAgent   String?
-  createdAt   DateTime @default(now())
-  expiresAt   DateTime
-}
-
 model LoginHistory {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())

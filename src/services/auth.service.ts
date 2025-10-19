@@ -413,7 +413,7 @@ export class AuthService {
     };
   }
 
-  public async logout(refreshToken: string): Promise<{ revoked: boolean }> {
+  public async logout(refreshToken: string): Promise<{ revoked: boolean,id:string }> {
     try {
       // 1️⃣ Vérifier que le token existe
       if (!refreshToken) throw new HttpException(400, 'No refresh token provided');
@@ -435,7 +435,7 @@ export class AuthService {
         data: { isRevoked: true, revokedAt: new Date() },
       });
 
-      return { revoked: true };
+      return { revoked: true,id:decoded.id };
     } catch (error) {
       throw new HttpException(401, 'Invalid or expired refresh token');
     }

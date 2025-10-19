@@ -43,7 +43,7 @@ export class AuthController {
 
       // 🔐 Cas : 2FA activé → on attend le code
       if (result.code) {
-       return res.status(202).json({
+        return res.status(202).json({
           message: 'Double authentification requise',
           tempToken: result.code,
         });
@@ -58,9 +58,13 @@ export class AuthController {
 
   public login2FA = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { code } = req.body;
-      const result = await this.doubleFa.verifyLoginCode(req.user.id, code);
-      res.status(200).json(result);
+      const ipAddress = String(req.ip || 'unknown');
+      const userAgent = String(req.headers['user-agent'] || 'unknown');
+      const { code, tempToken } = req.body;
+      const result = await this.auth.loginWith2FA(code, tempToken, ipAddress, userAgent);
+
+      res.setHeader('Set-Cookie', [result.cookie]);
+      res.status(200).json({ data: result.accessToken, message: 'login' });
     } catch (error) {
       next(error);
     }
@@ -78,14 +82,13 @@ export class AuthController {
 
   public logOut = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userId = req.user.id; // Récupère l'ID via le AuthMiddleware
-      // 1. Suppression ciblée dans Redis
-      await cacheService.del(`auth:${userId}`);
-
       const refreshToken = req.cookies?.refreshToken;
       if (!refreshToken) throw new HttpException(400, 'No refresh token provided');
 
-      await this.auth.logout(refreshToken);
+      const { revoked, id } = await this.auth.logout(refreshToken);
+
+      //Suppression ciblée dans Redis
+      await cacheService.del(`auth:${id}`);
 
       // Supprimer les cookies
       res.setHeader('Set-Cookie', [
@@ -130,7 +133,7 @@ export class AuthController {
       const cachedUser = await cacheService.get(cacheKey);
 
       if (cachedUser) {
-        return res.status(200).json(cachedUser); // Cache Hit : Retour immédiat
+        return res.status(200).json({ data: cachedUser }); // Cache Hit : Retour immédiat
       }
 
       // 2. Cache Miss : Aller chercher dans la DB
@@ -139,7 +142,7 @@ export class AuthController {
       if (user) {
         // 3. Mettre à jour le cache et retourner
         await cacheService.set(cacheKey, user, 3600);
-        return res.status(200).json(user);
+        return res.status(200).json({ data: user });
       }
 
       return res.status(404).json({ message: 'Utilisateur non trouvé' });
