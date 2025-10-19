@@ -12,6 +12,7 @@ export interface User {
   status: UserStatus;
   avatar: string;
   is2FaEnable: boolean;
+  twoFaSecret?: string;
   twoFaMethod?: Method2Fa;
   twoFaVerified: boolean;
   failedLoginAttempts: number;

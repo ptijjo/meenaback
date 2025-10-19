@@ -9,10 +9,12 @@ import { ORIGIN } from '../config';
 import { HttpException } from '../exceptions/httpException';
 import { User } from '../interfaces/users.interface';
 import { cacheService } from '../server';
+import { TwoFactorService } from '../services/twofactor.service';
 
 export class AuthController {
   private auth = Container.get(AuthService);
   private user = Container.get(UserService);
+  public doubleFa = Container.get(TwoFactorService);
 
   public signUp = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -31,16 +33,44 @@ export class AuthController {
     res.status(200).json(result);
   };
 
-  public logIn = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  public logIn = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const userData: CreateAuthDto = req.body;
       const ipAddress = String(req.ip || 'unknown');
       const userAgent = String(req.headers['user-agent'] || 'unknown');
 
-      const { cookie, accessToken } = await this.auth.login(userData, ipAddress, userAgent);
+      const result = await this.auth.login(userData, ipAddress, userAgent);
 
-      res.setHeader('Set-Cookie', [cookie]);
-      res.status(200).json({ data: accessToken, message: 'login' });
+      // 🔐 Cas : 2FA activé → on attend le code
+      if (result.code) {
+       return res.status(202).json({
+          message: 'Double authentification requise',
+          tempToken: result.code,
+        });
+      }
+
+      res.setHeader('Set-Cookie', [result.cookie]);
+      return res.status(200).json({ data: result.accessToken, message: 'login' });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public login2FA = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { code } = req.body;
+      const result = await this.doubleFa.verifyLoginCode(req.user.id, code);
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public verify2FA = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { code } = req.body;
+      const result = await this.doubleFa.verifyCode(req.user.id, code);
+      res.status(200).json(result);
     } catch (error) {
       next(error);
     }
@@ -91,7 +121,7 @@ export class AuthController {
 
   public whoIsLog = async (req: RequestWithUser, res: Response, next: NextFunction) => {
     if (!req.user || !req.user.id) {
-     return res.status(401).json({ message: 'Unauthorized: no valid token' });
+      return res.status(401).json({ message: 'Unauthorized: no valid token' });
     }
     const userId = req.user.id;
     const cacheKey = `auth:${userId}`;
@@ -100,7 +130,7 @@ export class AuthController {
       const cachedUser = await cacheService.get(cacheKey);
 
       if (cachedUser) {
-       return res.status(200).json(cachedUser); // Cache Hit : Retour immédiat
+        return res.status(200).json(cachedUser); // Cache Hit : Retour immédiat
       }
 
       // 2. Cache Miss : Aller chercher dans la DB
@@ -109,7 +139,7 @@ export class AuthController {
       if (user) {
         // 3. Mettre à jour le cache et retourner
         await cacheService.set(cacheKey, user, 3600);
-       return res.status(200).json(user);
+        return res.status(200).json(user);
       }
 
       return res.status(404).json({ message: 'Utilisateur non trouvé' });

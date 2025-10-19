@@ -65,7 +65,8 @@ model User {
   status                UserStatus @default(offLine)
   avatar                String     @default("https://vibz.s3.eu-central-1.amazonaws.com/logo/photoProfil.png")
   is2FaEnable           Boolean    @default(false)
-  twoFaMethod           Method2Fa?
+  twoFaSecret           String?    @unique //secret TOTP encodé en base32
+  twoFaMethod           Method2Fa? @default(totp)
   twoFaVerified         Boolean    @default(false)
   failedLoginAttempts   Int        @default(0)
   lockedUntil           DateTime?
@@ -103,6 +104,15 @@ model UserSecret {
   invitId String @unique
 }
 
+model Pending2FA{
+  id          String   @id @default(cuid())
+  userId      String
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+}
+
 model LoginHistory {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
@@ -111,17 +121,17 @@ model LoginHistory {
 }
 
 model Session {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  jti       String   @unique // identifiant unique du refresh token (JWT ID)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jti       String    @unique // identifiant unique du refresh token (JWT ID)
   userAgent String
   ipAddress String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   expiresAt DateTime
-  isRevoked Boolean  @default(false)
-  revokedAt   DateTime?
+  isRevoked Boolean   @default(false)
+  revokedAt DateTime?
 }
 
 model LoginAttempts {

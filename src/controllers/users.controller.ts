@@ -47,7 +47,7 @@ export class UserController {
         userData.avatar = url;
       }
 
-      const updateUserData: User = await this.user.updateUser(authorId, userData);
+      const updateUserData = await this.user.updateUser(authorId, userData);
 
       res.status(200).json({ data: updateUserData, message: 'updated' });
     } catch (error) {

@@ -1,5 +1,5 @@
 import { hash } from 'bcrypt';
-import { Service } from 'typedi';
+import Container, { Service } from 'typedi';
 import { User } from '../interfaces/users.interface';
 import { HttpException } from '../exceptions/httpException';
 import { UpdateUserDto } from '../dtos/users.dto';
@@ -8,25 +8,27 @@ import safeDelete from '../utils/safeDeleteFilePath';
 import path from 'path';
 import { cacheService } from '../server';
 import { Role } from '@prisma/client';
+import { TwoFactorService } from './twofactor.service';
 
 @Service()
 export class UserService {
   public user = prisma.user;
+  public doubleFa = Container.get(TwoFactorService);
 
   public async findAllUser(): Promise<User[]> {
     let allUser: User[] = await this.user.findMany({
       include: {
         Session: {
           where: {
-            isRevoked:false,
-          }
+            isRevoked: false,
+          },
         },
         UserSecret: true,
       },
     });
 
     if (allUser === null) allUser = [];
-    
+
     return allUser;
   }
 
@@ -37,7 +39,9 @@ export class UserService {
     return findUser;
   }
 
-  public async updateUser(userId: string, userData: UpdateUserDto): Promise<User> {
+  public async updateUser(userId: string, userData: UpdateUserDto): Promise<{ updateUserData: User; qrCodeUrl?: string }> {
+    let qrCodeUrl: string;
+
     const findUser: User = await this.user.findUnique({ where: { id: userId } });
     if (!findUser) throw new HttpException(409, "User doesn't exist");
 
@@ -49,19 +53,18 @@ export class UserService {
         throw new HttpException(409, 'Authorisation admin requise');
       }
       updatedUserData.role = userData.role;
-    };
+    }
 
     // Hachage du mot de passe s'il est mis à jour
     if (userData.password) {
       updatedUserData.password = await hash(userData.password, 10);
-    };
+    }
 
     // Gestion de l'avatar
     if (userData.avatar && findUser.avatar && userData.avatar !== findUser.avatar) {
-     
       try {
         let filePath: string;
-        
+
         // Extraction du chemin après le port (ex: "/public/avatar/...")
         const relativePath = new URL(findUser.avatar).pathname;
 
@@ -69,16 +72,14 @@ export class UserService {
         if (!relativePath.startsWith('/avatar')) {
           // Si c'est pas /avatar, on remplace par /avatar/filename
           const fileName = path.basename(relativePath);
-          
+
           filePath = path.join(__dirname, '..', '..', 'public', 'avatar', fileName);
-          
         } else {
           // Sinon on construit le chemin local classique
           filePath = path.join(__dirname, '..', '..', relativePath);
         }
 
         await safeDelete(filePath);
-
       } catch (err) {
         if (err.code === 'ENOENT') {
           throw new HttpException(409, `Fichier déjà supprimé ou introuvable : ${err.path}`);
@@ -87,18 +88,33 @@ export class UserService {
         }
       }
     }
-  
+
+    //Activation du double facteur
+    if (userData.is2FaEnable && !findUser.is2FaEnable) {
+      qrCodeUrl = (await this.doubleFa.generateSecret(findUser.id)).qrCodeUrl;
+    }
+
+    // Désactivation du 2FA
+    if (userData.is2FaEnable === false && findUser.is2FaEnable) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          is2FaEnable: false,
+          twoFaSecret: null,
+        },
+      });
+    }
 
     const updateUserData = await this.user.update({ where: { id: userId }, data: { ...userData } });
     await cacheService.del(`user:${userId}`);
-    return updateUserData;
+    return { updateUserData, qrCodeUrl };
   }
 
-  public async deleteUser(userId: string,authUser: { id: string; role: string }): Promise<User> {
+  public async deleteUser(userId: string, authUser: { id: string; role: string }): Promise<User> {
     const findUser: User = await this.user.findUnique({ where: { id: userId } });
     if (!findUser) throw new HttpException(409, "User doesn't exist");
 
-     if (authUser.id !== userId && authUser.role === String(Role.user)) {
+    if (authUser.id !== userId && authUser.role === String(Role.user)) {
       throw new HttpException(403, 'Not authorized to delete this user');
     }
 
