@@ -21,7 +21,7 @@ export class UserRoute implements Routes {
   private initializeRoutes() {
     this.router.get(`${this.path}`, AuthMiddleware,RoleGuard([Role.admin, Role.modo]), this.user.getUsers);
     this.router.get(`${this.path}/:id`, AuthMiddleware, RoleGuard([Role.admin, Role.modo]), this.user.getUserById);
-    this.router.patch(`${this.path}/:id`, AuthMiddleware/*, ValidationMiddleware(UpdateUserDto)*/, Avatar, resizeAvatar, this.user.updateUser);
+    this.router.patch(`${this.path}/:id`, AuthMiddleware, /*ValidationMiddleware(UpdateUserDto),*/ Avatar, resizeAvatar, this.user.updateUser);
     this.router.delete(`${this.path}/:id`, AuthMiddleware, this.user.deleteUser);
   }
 }
