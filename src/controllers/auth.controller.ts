@@ -28,7 +28,7 @@ export class AuthController {
   };
 
   public verifyEmail = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    const token = req.query.token as string;
+    const token = String(req.query.token);
     const result = await this.auth.verifyEmail(token);
     res.status(200).json(result);
   };
@@ -169,7 +169,7 @@ export class AuthController {
       res.setHeader('Set-Cookie', [cookie]);
 
       // 📤 Renvoi du nouvel access token (le front Redux va le stocker)
-      res.status(200).json({ accessToken });
+      res.status(200).json({ data: { accessToken },message: 'Access token refreshed'});
     } catch (error) {
       console.error('Erreur refresh :', error);
       // Si c'est une HttpException, utiliser son statut, sinon 401

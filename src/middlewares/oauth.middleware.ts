@@ -8,8 +8,8 @@ console.log(`${SERVEUR_URL}/auth/google/callback`)
 passport.use(
   new GoogleStrategy(
     {
-      clientID: GOOGLE_CLIENT_ID! as string,
-      clientSecret: GOOGLE_CLIENT_SECRET! as string,
+      clientID: String(GOOGLE_CLIENT_ID!),
+      clientSecret: String(GOOGLE_CLIENT_SECRET!),
       callbackURL: `${SERVEUR_URL}/auth/google/callback`,
     },
     (accessToken, refreshToken, profile, done) => {

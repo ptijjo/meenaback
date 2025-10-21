@@ -19,7 +19,7 @@ export class CacheService {
 
   // 📤 Récupère une valeur
   public async get<T = any>(key: string): Promise<T | null> {
-    const data = (await this.redisClient.get(key)) as string;
+    const data = String(await this.redisClient.get(key));
     return data ? JSON.parse(data) : null;
   }
 

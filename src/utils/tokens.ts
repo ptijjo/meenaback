@@ -17,7 +17,7 @@ export const createAccessToken =(user: User) : TokenData =>{
     
     const dataStoredInToken: DataStoredInToken = { id: user.id };
     const secretKey: string = SECRET_KEY;
-    const expiresIn: number = ACCESS_TOKEN_EXPIRES_IN as unknown as number;
+    const expiresIn: number = Number(ACCESS_TOKEN_EXPIRES_IN);
 
     return { expiresIn, token: sign(dataStoredInToken, secretKey, { expiresIn }) };
 }

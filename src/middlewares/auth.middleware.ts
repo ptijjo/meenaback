@@ -24,14 +24,15 @@ export const AuthMiddleware = async (req: RequestWithUser, res: Response, next: 
     }
     
     // 1. Décode le JWT pour obtenir l'ID (cela gère les erreurs de signature/expiration)
-    const decoded = verify(Authorization, SECRET_KEY as string) as DataStoredInToken;
+    const decoded = verify(Authorization, String(SECRET_KEY), { ignoreExpiration: true }) as DataStoredInToken;
+    console.log('✅ Décodé sans vérifier exp:', decoded);
     const userId = decoded.id;
 
     // 2. Nouvelle clé de cache : basée sur l'ID utilisateur
     // Note: Utiliser 'auth:' ou 'user:' est une convention. 'user:' est très clair.
     const cacheKey = `user:${userId}`; 
 
-    // 3. Cherche d’abord l’utilisateur dans Redis (Cache Hit)
+    // 3. Cherche d'abord l'utilisateur dans Redis (Cache Hit)
     const cachedUser = await cacheService.get(cacheKey);
 
     console.log("user dans le cache redis : ",cachedUser)
@@ -40,11 +41,11 @@ export const AuthMiddleware = async (req: RequestWithUser, res: Response, next: 
       return next();
     }
 
-    // 4. Récupère l’utilisateur depuis la DB (Cache Miss)
+    // 4. Récupère l'utilisateur depuis la DB (Cache Miss)
     const findUser = await prisma.user.findUnique({ where: { id: String(userId) } });
 
     if (findUser) {
-      // 5. Met l’utilisateur en cache
+      // 5. Met l'utilisateur en cache
       // console.log("le ttl de redis est : ", CACHE_TTL);
       await cacheService.set(cacheKey, findUser, CACHE_TTL);
 

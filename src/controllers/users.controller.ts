@@ -66,7 +66,7 @@ export class UserController {
   public deleteUser = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = String(req.params.id);
-      const auth = { id: req.user.id as string, role: req.user.role as string };
+      const auth = { id: String(req.user.id), role: String(req.user.role) };
       const deleteUserData: User = await this.user.deleteUser(userId, auth);
 
       res.status(200).json({ data: deleteUserData, message: 'deleted' });
