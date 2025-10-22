@@ -1,4 +1,4 @@
-import { Method2Fa, User } from '@prisma/client';
+import { User } from '@prisma/client';
 import { compare, hash } from 'bcrypt';
 import Container, { Service } from 'typedi';
 import { CreateUserDto } from '../dtos/users.dto';
@@ -22,7 +22,9 @@ import { MailService } from './mails.service';
 import prisma from '../utils/prisma';
 import { generateId } from '../utils/generateId';
 import { TwoFactorService } from './twofactor.service';
-
+import { cacheService } from '../server';
+import e from 'cors';
+import { UserSecret } from '../interfaces/userSecret.interface';
 
 @Service()
 export class AuthService {
@@ -32,7 +34,7 @@ export class AuthService {
   public doubleFa = Container.get(TwoFactorService);
 
   public async signup(userData: CreateUserDto): Promise<User> {
-    // 1️⃣ Vérifie si l’utilisateur existe déjà
+    // 1️⃣ Vérifie si l'utilisateur existe déjà
     const findUser: User = await this.users.findUnique({ where: { email: userData.email } });
     if (findUser) throw new HttpException(409, `This email ${userData.email} already exists`);
 
@@ -43,7 +45,7 @@ export class AuthService {
     const verificationToken = randomBytes(32).toString('hex');
     const verificationExpiresAt = new Date(Date.now() + Number(EXPIRES_TOKEN_VERIFICATION_EMAIL)); // 48h
 
-    // 4️⃣ Créer l’utilisateur non vérifié
+    // 4️⃣ Créer l'utilisateur non vérifié
     const createUserData: User = await this.users.create({
       data: {
         ...userData,
@@ -59,7 +61,7 @@ export class AuthService {
       data: {
         name: createUserData.secretName,
         user: { connect: { id: createUserData.id } },
-        invitId: generateId(9),
+        ID: generateId(9),
       },
     });
 
@@ -74,8 +76,8 @@ export class AuthService {
   }
 
   public async verifyEmail(token: string): Promise<User> {
-    // 1️⃣ Trouver l’utilisateur avec ce token
-    const user = await this.prisma.user.findFirst({ where: { verificationToken: token } });
+    // 1️⃣ Trouver l'utilisateur avec ce token
+    const user = await this.prisma.user.findFirst({ where: { verificationToken: token,desactivateAccountDate:null } });
 
     if (!user) throw new HttpException(400, 'Lien de vérification invalide');
     if (user.isVerified) throw new HttpException(400, 'Ce compte est déjà vérifié');
@@ -98,97 +100,93 @@ export class AuthService {
     return verifiedUser;
   }
 
-  private async finalizeLogin(user: User, ipAddress: string, userAgent: string):Promise<{cookie:string,findUser:User,accessToken:string}> {
-
-  // 1️⃣ Vérifier une session existante
-  const existingSession = await this.prisma.session.findFirst({
-    where: {
-      userId: user.id,
-      ipAddress,
-      userAgent,
-      isRevoked: false,
-      expiresAt: { gt: new Date() },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
-
-  // 2️⃣ Créer ou renouveler la session
-  let refreshTokenData;
-  if (existingSession) {
-    refreshTokenData = createRefreshToken(user);
-    await this.prisma.session.update({
-      where: { id: existingSession.id },
-      data: {
-        jti: refreshTokenData.jti,
-        expiresAt: new Date(Date.now() + refreshTokenData.expiresIn * 1000),
-      },
-    });
-  } else {
-    // Vérifie le nombre de sessions actives
-    const activeSessionsCount = await this.prisma.session.count({
+  private async finalizeLogin(user: User, ipAddress: string, userAgent: string): Promise<{ cookie: string; findUser: User; accessToken: string }> {
+    // 1️⃣ Vérifier une session existante
+    const existingSession = await this.prisma.session.findFirst({
       where: {
         userId: user.id,
+        ipAddress,
+        userAgent,
         isRevoked: false,
         expiresAt: { gt: new Date() },
       },
+      orderBy: { createdAt: 'desc' },
     });
 
-    if (activeSessionsCount >= Number(MAX_ACTIVE_SESSIONS)) {
-      throw new HttpException(
-        403,
-        `La limite de ${MAX_ACTIVE_SESSIONS} sessions actives est atteinte.`,
-      );
+    // 2️⃣ Créer ou renouveler la session
+    let refreshTokenData;
+    if (existingSession) {
+      refreshTokenData = createRefreshToken(user);
+      await this.prisma.session.update({
+        where: { id: existingSession.id },
+        data: {
+          jti: refreshTokenData.jti,
+          expiresAt: new Date(Date.now() + refreshTokenData.expiresIn * 1000),
+        },
+      });
+    } else {
+      // Vérifie le nombre de sessions actives
+      const activeSessionsCount = await this.prisma.session.count({
+        where: {
+          userId: user.id,
+          isRevoked: false,
+          expiresAt: { gt: new Date() },
+        },
+      });
+
+      if (activeSessionsCount >= Number(MAX_ACTIVE_SESSIONS)) {
+        throw new HttpException(403, `La limite de ${MAX_ACTIVE_SESSIONS} sessions actives est atteinte.`);
+      }
+
+      // Crée une nouvelle session
+      refreshTokenData = createRefreshToken(user);
+
+      await this.prisma.session.create({
+        data: {
+          user: { connect: { id: user.id } },
+          jti: refreshTokenData.jti,
+          userAgent,
+          ipAddress,
+          expiresAt: new Date(Date.now() + refreshTokenData.expiresIn * 1000),
+        },
+      });
     }
 
-    // Crée une nouvelle session
-    refreshTokenData = createRefreshToken(user);
-    
-    await this.prisma.session.create({
-      data: {
-        user: { connect: { id: user.id } },
-        jti: refreshTokenData.jti,
-        userAgent,
-        ipAddress,
-        expiresAt: new Date(Date.now() + refreshTokenData.expiresIn * 1000),
-      },
+    // 3️⃣ Révoquer les sessions expirées
+    await this.prisma.session.updateMany({
+      where: { expiresAt: { lt: new Date() }, isRevoked: false },
+      data: { isRevoked: true },
     });
+
+    // 4️⃣ Créer tokens + cookie
+    const accessTokenData = createAccessToken(user);
+    const cookie = createCookie(refreshTokenData);
+
+    // 5️⃣ Historiser la connexion
+    await this.prisma.loginHistory.create({
+      data: { user: { connect: { id: user.id } } },
+    });
+
+    return { cookie, findUser: user, accessToken: accessTokenData.token };
   }
-
-  // 3️⃣ Révoquer les sessions expirées
-  await this.prisma.session.updateMany({
-    where: { expiresAt: { lt: new Date() }, isRevoked: false },
-    data: { isRevoked: true },
-  });
-
-  // 4️⃣ Créer tokens + cookie
-  const accessTokenData = createAccessToken(user);
-  const cookie = createCookie(refreshTokenData);
-
-  // 5️⃣ Historiser la connexion
-  await this.prisma.loginHistory.create({
-    data: { user: { connect: { id: user.id } } },
-  });
-
-  return { cookie, findUser:user, accessToken: accessTokenData.token };
-}
-
 
   public async login(
     userData: CreateAuthDto,
     ipAddressData: string,
     userAgentData: string,
-  ): Promise<{ cookie: string; findUser: User; accessToken: string; code?:string }> {
+  ): Promise<{ cookie: string; findUser: User; accessToken: string; code?: string }> {
+
     //GoogleId present
     if (userData.googleId) {
-      let findUser: User = await this.users.findUnique({ where: { googleId: userData.googleId } });
+      let findUser: User = await this.users.findUnique({ where: { googleId: userData.googleId,desactivateAccountDate:null } });
 
       // Vérifier s'il existe déjà un utilisateur avec le même email
-      const existingByEmail = await this.users.findUnique({ where: { email: userData.email } });
+      const existingByEmail = await this.users.findUnique({ where: { email: userData.email,desactivateAccountDate:null } });
 
       if (existingByEmail) {
         // On associe le googleId au compte existant
         findUser = await this.prisma.user.update({
-          where: { id: existingByEmail.id },
+          where: { id: existingByEmail.id ,desactivateAccountDate:null},
           data: { googleId: userData.googleId },
         });
       }
@@ -202,6 +200,7 @@ export class AuthService {
             googleId: userData.googleId,
             secretName: `user` + generateId(7),
             isVerified: true,
+            status:"onLine",
           },
         });
 
@@ -209,7 +208,7 @@ export class AuthService {
           data: {
             name: findUser.secretName,
             user: { connect: { id: findUser.id } },
-            invitId: generateId(9),
+            ID: generateId(9),
           },
         });
       }
@@ -288,7 +287,7 @@ export class AuthService {
 
     // 1️⃣ Vérifier si l'utilisateur existe
     const findUser = await this.prisma.user.findUnique({
-      where: { email: userData.email },
+      where: { email: userData.email, desactivateAccountDate: null },
     });
     if (!findUser) throw new HttpException(401, 'Identifiants incorrects');
 
@@ -335,31 +334,28 @@ export class AuthService {
     // 6️⃣ Réinitialiser les échecs
     await this.prisma.user.update({
       where: { email: findUser.email },
-      data: { failedLoginAttempts: 0, lockedUntil: null },
+      data: { failedLoginAttempts: 0, lockedUntil: null,status: "onLine" },
     });
 
     //si double FA activée
     if (findUser.is2FaEnable) {
       // Créer un token temporaire (JWT 5 min)
       const code = sign({ userId: findUser.id }, TWO_FA_SECRET_KEY, { expiresIn: '5m' });
-      return {cookie:"",findUser,accessToken:"",code}
+      return { cookie: '', findUser, accessToken: '', code };
     }
 
-
     return await this.finalizeLogin(findUser, ipAddressData, userAgentData);
-
   }
 
   public async loginWith2FA(code: string, tempToken: string, ipAddress: string, userAgent: string) {
-  const decoded = verify(tempToken, TWO_FA_SECRET_KEY) as { userId: string };
-  const userId = decoded.userId;
+    const decoded = verify(tempToken, TWO_FA_SECRET_KEY) as { userId: string };
+    const userId = decoded.userId;
 
-  const user = await this.doubleFa.verifyLoginCode(userId,code)
+    const user = await this.doubleFa.verifyLoginCode(userId, code);
 
-  // ✅ Code valide → on termine le login
-  return await this.finalizeLogin(user, ipAddress, userAgent);
-}
-
+    // ✅ Code valide → on termine le login
+    return await this.finalizeLogin(user, ipAddress, userAgent);
+  }
 
   public async refreshToken(oldRefreshToken: string, ipAddress: string, userAgent: string): Promise<{ cookie: string; accessToken: string }> {
     let decoded: any;
@@ -414,7 +410,7 @@ export class AuthService {
     };
   }
 
-  public async logout(refreshToken: string): Promise<{ revoked: boolean,id:string }> {
+  public async logout(refreshToken: string): Promise<{ revoked: boolean; id: string }> {
     try {
       // 1️⃣ Vérifier que le token existe
       if (!refreshToken) throw new HttpException(400, 'No refresh token provided');
@@ -435,8 +431,8 @@ export class AuthService {
         where: { jti: decoded.jti },
         data: { isRevoked: true, revokedAt: new Date() },
       });
-
-      return { revoked: true,id:decoded.id };
+      await cacheService.del(`user:${decoded.id}`);
+      return { revoked: true, id: decoded.id };
     } catch (error) {
       throw new HttpException(401, 'Invalid or expired refresh token');
     }
@@ -459,5 +455,52 @@ export class AuthService {
     });
 
     return { revokedCount: result.count };
+  }
+
+  public async desactiveAccount(userId: string): Promise<User> {
+    // 1️⃣ Vérifie si l'utilisateur existe déjà
+    const findUser: User | null = await this.users.findUnique({ where: { id: userId } });
+    if (!findUser) throw new HttpException(409, `Compte introuvable`);
+
+    const desactiveAccount = await this.users.update({
+      where: {
+        id: findUser.id,
+      },
+      data: {
+        desactivateAccountDate: new Date(Date.now()),
+      },
+    });
+
+    await this.prisma.session.deleteMany({ where: { userId: desactiveAccount.id } })
+
+    return desactiveAccount;
+  }
+
+  public async recuperationAccount(userData: CreateAuthDto, idSecret: string): Promise<User>{
+    
+    const existAccount = await this.users.findFirst({
+      where: {
+        email: userData.email, desactivateAccountDate: {
+          not: null
+        }
+      },
+      include: {
+        UserSecret:true
+      }
+    });
+
+    if (!existAccount) throw new HttpException(409, "Utilisateur inconnu !");
+
+    if (existAccount.UserSecret.ID !== idSecret) throw new HttpException(409, "Utilisasteur inconnu !")
+    
+    const activate = await this.users.update({
+      where: { id: existAccount.id }, data: {
+        desactivateAccountDate: null
+      }
+    });
+
+    return activate;
+    
+    
   }
 }

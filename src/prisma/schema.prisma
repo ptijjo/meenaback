@@ -44,6 +44,15 @@ enum TypeMessage {
   CALL
 }
 
+enum NotificationType {
+  friend_request //nouvelle requete
+  friend_accept //Quand le demande est acceptée
+}
+
+enum NotifiableType {
+  friendship //Demande d'ami
+}
+
 enum FriendshipStatus {
   pending
   accepted
@@ -54,25 +63,26 @@ enum FriendshipStatus {
 // 👤 USER & AUTH
 // ======================================
 model User {
-  id                    String     @id @default(cuid())
-  email                 String     @unique
-  password              String?
-  secretName            String
-  phone                 String?
-  phoneVerified         Boolean    @default(false)
-  googleId              String?    @unique
-  role                  Role       @default(user)
-  status                UserStatus @default(offLine)
-  avatar                String     @default("https://vibz.s3.eu-central-1.amazonaws.com/logo/photoProfil.png")
-  is2FaEnable           Boolean    @default(false)
-  twoFaSecret           String?    @unique //secret TOTP encodé en base32
-  twoFaMethod           Method2Fa? @default(totp)
-  twoFaVerified         Boolean    @default(false)
-  failedLoginAttempts   Int        @default(0)
-  lockedUntil           DateTime?
-  isVerified            Boolean    @default(false)
-  verificationToken     String?
-  verificationExpiresAt DateTime?
+  id                     String     @id @default(cuid())
+  email                  String     @unique
+  password               String?
+  secretName             String
+  phone                  String?
+  phoneVerified          Boolean    @default(false)
+  googleId               String?    @unique
+  role                   Role       @default(user)
+  status                 UserStatus @default(offLine)
+  avatar                 String     @default("https://vibz.s3.eu-central-1.amazonaws.com/logo/photoProfil.png")
+  is2FaEnable            Boolean    @default(false)
+  twoFaSecret            String?    @unique //secret TOTP encodé en base32
+  twoFaMethod            Method2Fa? @default(totp)
+  twoFaVerified          Boolean    @default(false)
+  failedLoginAttempts    Int        @default(0)
+  lockedUntil            DateTime?
+  desactivateAccountDate DateTime?
+  isVerified             Boolean    @default(false)
+  verificationToken      String?
+  verificationExpiresAt  DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -90,19 +100,25 @@ model User {
   messages             Message[]
   conversationsCreated Conversation[]            @relation("UserCreatedConversations")
 
-  DemandeurAmi Friendship[] @relation("FriendRequester")
-  ReceveurAmi  Friendship[] @relation("FriendAddressee")
+  notificationReceveur Notification[] @relation(name: "receveur")
+
+  notificationDemandeur Notification[] @relation(name: "demandeur")
 }
 
 // ======================================
 // 🔐 AUTH RELATIONS
 // ======================================
 model UserSecret {
-  userId  String @id
-  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name    String
-  invitId String @unique
+  userId String @id
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name   String
+  ID     String @unique
+
+  // Relations
+  DemandeurAmi Friendship[] @relation("FriendRequester")
+  ReceveurAmi  Friendship[] @relation("FriendAddressee")
 }
+
 model LoginHistory {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
@@ -170,8 +186,8 @@ model Friendship {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
-  requester User @relation("FriendRequester", fields: [requesterId], references: [id])
-  addressee User @relation("FriendAddressee", fields: [addresseeId], references: [id])
+  requester UserSecret @relation("FriendRequester", fields: [requesterId], references: [ID])
+  addressee UserSecret @relation("FriendAddressee", fields: [addresseeId], references: [ID])
 
   @@unique([requesterId, addresseeId])
 }
@@ -232,4 +248,23 @@ model Message {
   @@index([senderId])
   @@index([conversationId])
   @@index([createdAt])
+}
+
+//=======================================
+// 🚨 NOTIFICATIONS
+//=======================================
+model Notification {
+  id         String           @id @default(cuid())
+  type       NotificationType
+  targetId   String //"Pour avoir l'id de la story ajoutée ou message envoyé ou conversation crée"
+  targetType NotifiableType //"Pour savoir s'il est mentionné dans un message ou tag dans une story"
+  read       Boolean          @default(false)
+  createdAt  DateTime         @default(now())
+  delivered  Boolean          @default(false)
+  seenAt     DateTime?
+  meta       Json?
+  receiverId String
+  receiver   User             @relation(name: "receveur", fields: [receiverId], references: [id], onDelete: Cascade)
+  senderId   String
+  sender     User             @relation(name: "demandeur", fields: [senderId], references: [id], onDelete: Cascade)
 }

@@ -17,6 +17,7 @@ export interface User {
   twoFaVerified: boolean;
   failedLoginAttempts: number;
   lockedUntil?: Date;
+  desactivateAccountDate?:Date,
   isVerified: boolean;
   verificationToken?: string;
   verificationExpiresAt?: Date;

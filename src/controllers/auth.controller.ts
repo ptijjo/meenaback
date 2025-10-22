@@ -28,7 +28,8 @@ export class AuthController {
   };
 
   public verifyEmail = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    const token = String(req.query.token);
+    const token = String(req.params.token);
+    console.log("token de vérification : ",token)
     const result = await this.auth.verifyEmail(token);
     res.status(200).json(result);
   };
@@ -62,7 +63,6 @@ export class AuthController {
       const userAgent = String(req.headers['user-agent'] || 'unknown');
       const { code, tempToken } = req.body;
       const result = await this.auth.loginWith2FA(code, tempToken, ipAddress, userAgent);
-   
 
       res.setHeader('Set-Cookie', [result.cookie]);
       res.status(200).json({ data: result.accessToken, message: 'login' });
@@ -169,7 +169,7 @@ export class AuthController {
       res.setHeader('Set-Cookie', [cookie]);
 
       // 📤 Renvoi du nouvel access token (le front Redux va le stocker)
-      res.status(200).json({ data: { accessToken },message: 'Access token refreshed'});
+      res.status(200).json({ data: { accessToken }, message: 'Access token refreshed' });
     } catch (error) {
       console.error('Erreur refresh :', error);
       // Si c'est une HttpException, utiliser son statut, sinon 401
@@ -177,6 +177,34 @@ export class AuthController {
       res.sendStatus(status); // Utilisez 401 si le token est rejeté
     }
   };
+
+  public desactivateAccount = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.user.id;
+
+      const desactivate = await this.auth.desactiveAccount(userId);
+
+      res.status(200).json({ message: 'Compte désactivé !', data: desactivate });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public recuperationAccount = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
+    try {
+       const { idSecret } = req.body;
+    const userData = req.body;
+
+    const activate = await this.auth.recuperationAccount(userData, idSecret);
+
+    res.status(200).json({message:"Votre compte est réactivé !", data:activate})
+    } catch (error) {
+      next(error)
+    }
+   
+  }
+
+  
 
   /** --------------------------------OAUTH--------------------------------------------------- */
 

@@ -27,9 +27,11 @@ export class AuthRoute implements Routes {
     this.router.get(`${this.path}logoutAll`, AuthMiddleware, this.auth.logOutAll);
     this.router.get(`${this.path}connected`, AuthMiddleware, this.auth.whoIsLog);
     this.router.post(`${this.path}refresh`, RefreshTokenMiddleware, this.auth.refreshToken);
+    this.router.post(`${this.path}desactivateAccount`, AuthMiddleware, this.auth.desactivateAccount);
+    this.router.post(`${this.path}recuperationAccount`, AuthMiddleware, this.auth.recuperationAccount);
     
-
-    //oauth Googole
+  
+    //***--------------------------------------oauth Googole---------------------------------------------------***
     this.router.get(`${this.path}`, this.auth.homeOauth);
     this.router.get(`${this.path}auth/google`, this.auth.googleAuth);
     this.router.get(`${this.path}auth/google/callback`, this.auth.googleAuthCallback);

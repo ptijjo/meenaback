@@ -16,7 +16,7 @@ export class UserService {
   public doubleFa = Container.get(TwoFactorService);
 
   public async findAllUser(): Promise<User[]> {
-    let allUser: User[] = await this.user.findMany({
+    let allUser: User[] = await this.user.findMany({where:{desactivateAccountDate:null},
       include: {
         Session: {
           where: {
@@ -33,7 +33,7 @@ export class UserService {
   }
 
   public async findUserById(userId: string): Promise<User> {
-    const findUser: User = await this.user.findUnique({ where: { id: userId } });
+    const findUser: User = await this.user.findUnique({ where: { id: userId ,desactivateAccountDate:null} });
     if (!findUser) throw new HttpException(409, "User doesn't exist");
 
     return findUser;
@@ -42,7 +42,7 @@ export class UserService {
   public async updateUser(userId: string, userData: UpdateUserDto): Promise<{ updateUserData: User; qrCodeUrl?: string }> {
     let qrCodeUrl: string;
 
-    const findUser: User = await this.user.findUnique({ where: { id: userId } });
+    const findUser: User = await this.user.findUnique({ where: { id: userId,desactivateAccountDate:null } });
     if (!findUser) throw new HttpException(409, "User doesn't exist");
 
     const updatedUserData = { ...userData };
@@ -92,7 +92,7 @@ export class UserService {
     // Désactivation du 2FA
     if (userData.is2FaEnable === false && findUser.is2FaEnable) {
       await prisma.user.update({
-        where: { id: userId },
+        where: { id: userId,desactivateAccountDate:null },
         data: {
           is2FaEnable: false,
           twoFaSecret: null,
@@ -104,20 +104,21 @@ export class UserService {
       delete userData.avatar; // Évite d'envoyer un objet
     }
 
-    const updateUserData = await this.user.update({ where: { id: userId }, data: { ...userData } });
+    const updateUserData = await this.user.update({ where: { id: userId,desactivateAccountDate:null }, data: { ...userData } });
     await cacheService.del(`user:${userId}`);
     return { updateUserData, qrCodeUrl };
   }
 
   public async deleteUser(userId: string, authUser: { id: string; role: string }): Promise<User> {
-    const findUser: User = await this.user.findUnique({ where: { id: userId } });
+    const findUser: User = await this.user.findUnique({ where: { id: userId,desactivateAccountDate:null } });
     if (!findUser) throw new HttpException(409, "User doesn't exist");
 
     if (authUser.id !== userId && authUser.role === String(Role.user)) {
       throw new HttpException(403, 'Not authorized to delete this user');
     }
 
-    const deleteUserData = await this.user.delete({ where: { id: userId } });
+    const deleteUserData = await this.user.delete({ where: { id: userId,desactivateAccountDate:null } });
     return deleteUserData;
   }
+ 
 }
