@@ -4,11 +4,13 @@ import { RequestWithUser } from '../interfaces/auth.interface';
 import Container from 'typedi';
 
 export class FriendshipController {
-  private friendshipService = Container.get(FriendshipService);
+  public friendshipService = Container.get(FriendshipService);
 
   public sendRequest = async (req: RequestWithUser, res: Response, next: NextFunction) => {
     try {
       const friendId = req.body.friendId;
+
+      console.log(`userId:${req.user.id} et addresseeId:${friendId}`)
       const friendship = await this.friendshipService.sendRequest(req.user.id, friendId);
       res.status(201).json(friendship);
     } catch (error) {

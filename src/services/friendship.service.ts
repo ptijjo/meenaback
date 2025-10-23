@@ -12,14 +12,19 @@ export class FriendshipService {
   public notification = Container.get(NotificationService);
 
   // Envoyer une demande d'ami
-  public async sendRequest(UserId: string, addresseeId: string): Promise<Friendship> {
+  public async sendRequest(userId: string, addresseeId: string): Promise<Friendship> {
     const requesterSecret = await prisma.userSecret.findUnique({
-      where: { ID: UserId },
+      where: { userId: userId },
     });
 
-    if (!requesterSecret) throw new HttpException(404, 'UserSecret introuvable pour le demandeur.');
+    const addresseeExists = await prisma.userSecret.findUnique({ where: { ID: addresseeId } });
+
+    if (!requesterSecret) throw new HttpException(400, `UserSecret requesterId introuvable: ${requesterSecret}`);
+    if (!addresseeExists) throw new HttpException(400, `UserSecret addresseeId introuvable: ${addresseeId}`);
 
     const requesterId = requesterSecret.ID;
+
+    console.log( "requesterId : ",requesterId)
 
     if (requesterId === addresseeId) throw new HttpException(400, "Impossible de s'ajouter soi-même.");
 
@@ -35,7 +40,11 @@ export class FriendshipService {
     if (existing) throw new HttpException(400, 'Une relation existe déjà.');
 
     const friendship = await this.friendship.create({
-      data: { requesterId, addresseeId, status: 'pending' },
+      data: {
+        requester: { connect: { ID: requesterId } },
+        addressee: { connect: { ID: addresseeId } },
+        status: 'pending',
+      },
     });
 
     const type = NotificationType.friend_request;
@@ -63,7 +72,7 @@ export class FriendshipService {
       where: { requesterId, addresseeId: userSecret.ID, status: 'pending' },
     });
 
-    if (!friendship) throw new HttpException(404, 'Demande introuvable.');
+    if (!friendship) throw new HttpException(404, 'Demande d amitié introuvable.');
 
     const response = await this.friendship.update({
       where: { id: friendship.id },

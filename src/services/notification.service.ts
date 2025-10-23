@@ -1,13 +1,15 @@
-import { Service } from 'typedi';
+import  { Service } from 'typedi';
 import prisma from '../utils/prisma';
 import { Notifications } from '../interfaces/notification.interface';
 import { HttpException } from '../exceptions/httpException';
-import { NotifiableType } from '@prisma/client';
 import { CreateNotificationDto } from '../dtos/notifications.dto';
+
+
 
 @Service()
 export class NotificationService {
-  public notification = prisma.notification;
+  private notification = prisma.notification;
+
 
   public async getNotifications(): Promise<Notifications[]> {
     const notifications: Notifications[] | null = await this.notification.findMany();
@@ -30,6 +32,7 @@ export class NotificationService {
   }
 
   public async notifyFriendRequest(notifData: CreateNotificationDto, targetId: string, senderId: string, receiverId: string): Promise<Notifications> {
+
     const newNotification: Notifications = await this.notification.create({
       data: {
         type: notifData.type,
@@ -40,10 +43,12 @@ export class NotificationService {
         meta: { message: "Nouvelle demande d'ami reçue" },
       },
     });
+    
     return newNotification;
   }
 
   public async notifyFriendAccept(notifData: CreateNotificationDto, targetId: string, senderId: string, receiverId: string): Promise<Notifications> {
+   
     const newNotification: Notifications = await this.notification.create({
       data: {
         type: notifData.type,

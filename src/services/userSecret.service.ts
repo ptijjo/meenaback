@@ -14,7 +14,14 @@ export class UserSecretService {
   }
 
   public async findUserSecretById(userSecretId: string): Promise<UserSecret> {
-    const findUser: UserSecret = await this.userSecret.findUnique({ where: { userId: userSecretId } });
+    const findUser: UserSecret = await this.userSecret.findUnique({ where: { ID: userSecretId } });
+    if (!findUser) throw new HttpException(409, "User doesn't exist");
+
+    return findUser;
+  }
+
+   public async findUserSecretByUserId(userId: string): Promise<UserSecret> {
+    const findUser: UserSecret = await this.userSecret.findUnique({ where: { userId: userId } });
     if (!findUser) throw new HttpException(409, "User doesn't exist");
 
     return findUser;

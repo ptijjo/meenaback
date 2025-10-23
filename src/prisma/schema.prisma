@@ -92,31 +92,29 @@ model User {
   Session       Session[]
   UserSecret    UserSecret?
   LoginAttempts LoginAttempts[]
-
-  // Groupes & Chat
-  groupsCreated        Group[]                   @relation("UserCreatedGroups")
-  groupMembers         GroupMember[]
-  conversations        ConversationParticipant[]
-  messages             Message[]
-  conversationsCreated Conversation[]            @relation("UserCreatedConversations")
-
-  notificationReceveur Notification[] @relation(name: "receveur")
-
-  notificationDemandeur Notification[] @relation(name: "demandeur")
+ 
 }
 
 // ======================================
 // 🔐 AUTH RELATIONS
 // ======================================
 model UserSecret {
-  userId String @id
+  userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   name   String
-  ID     String @unique
+  ID     String @id @unique
 
   // Relations
-  DemandeurAmi Friendship[] @relation("FriendRequester")
-  ReceveurAmi  Friendship[] @relation("FriendAddressee")
+  DemandeurAmi          Friendship[]   @relation("FriendRequester")
+  ReceveurAmi           Friendship[]   @relation("FriendAddressee")
+  notificationReceveur  Notification[] @relation(name: "receveur")
+  notificationDemandeur Notification[] @relation(name: "demandeur")
+  conversationsCreated Conversation[]            @relation("UserCreatedConversations")
+  conversations        ConversationParticipant[]
+   // Groupes & Chat
+  groupsCreated        Group[]                   @relation("UserCreatedGroups")
+  groupMembers         GroupMember[]
+  messages             Message[]
 }
 
 model LoginHistory {
@@ -157,7 +155,7 @@ model Group {
   name        String
   description String
   createdById String
-  createdBy   User     @relation("UserCreatedGroups", fields: [createdById], references: [id])
+  createdBy   UserSecret     @relation("UserCreatedGroups", fields: [createdById], references: [ID])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -172,7 +170,7 @@ model GroupMember {
   role     RoleGroup @default(member)
   joinedAt DateTime  @default(now())
 
-  user  User  @relation(fields: [userId], references: [id])
+  user  UserSecret  @relation(fields: [userId], references: [ID])
   group Group @relation(fields: [groupId], references: [id])
 
   @@unique([userId, groupId])
@@ -205,7 +203,7 @@ model Conversation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   authorId  String
-  author    User     @relation("UserCreatedConversations", fields: [authorId], references: [id])
+  author    UserSecret     @relation("UserCreatedConversations", fields: [authorId], references: [ID])
 
   participants ConversationParticipant[]
   messages     Message[]
@@ -221,7 +219,7 @@ model ConversationParticipant {
   joinedAt       DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  user         User         @relation(fields: [userId], references: [id])
+  user         UserSecret         @relation(fields: [userId], references: [ID])
   conversation Conversation @relation(fields: [conversationId], references: [id])
 
   @@unique([userId, conversationId])
@@ -242,7 +240,7 @@ model Message {
   senderId       String
   conversationId String
 
-  sender       User         @relation(fields: [senderId], references: [id])
+  sender       UserSecret         @relation(fields: [senderId], references: [ID])
   conversation Conversation @relation(fields: [conversationId], references: [id])
 
   @@index([senderId])
@@ -264,7 +262,7 @@ model Notification {
   seenAt     DateTime?
   meta       Json?
   receiverId String
-  receiver   User             @relation(name: "receveur", fields: [receiverId], references: [id], onDelete: Cascade)
+  receiver   UserSecret       @relation(name: "receveur", fields: [receiverId], references: [ID], onDelete: Cascade)
   senderId   String
-  sender     User             @relation(name: "demandeur", fields: [senderId], references: [id], onDelete: Cascade)
+  sender     UserSecret       @relation(name: "demandeur", fields: [senderId], references: [ID], onDelete: Cascade)
 }

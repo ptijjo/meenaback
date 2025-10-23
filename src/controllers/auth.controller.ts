@@ -12,8 +12,8 @@ import { cacheService } from '../server';
 import { TwoFactorService } from '../services/twofactor.service';
 
 export class AuthController {
-  private auth = Container.get(AuthService);
-  private user = Container.get(UserService);
+  public auth = Container.get(AuthService);
+  public user = Container.get(UserService);
   public doubleFa = Container.get(TwoFactorService);
 
   public signUp = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
