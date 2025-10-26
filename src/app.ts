@@ -20,6 +20,7 @@ import { createClient, RedisClientType } from 'redis';
 import path from 'path';
 import { socketAuthMiddleware } from './middlewares/socketAuth.middleware';
 import { createAdapter } from '@socket.io/redis-adapter';
+import { setIo } from './utils/socket/socket';
 
 type MorganFormat = 'dev' | 'combined';
 const LOG_FORMAT_MORGAN: MorganFormat = (LOG_FORMAT as MorganFormat) || 'dev';
@@ -56,6 +57,8 @@ export class App {
         credentials: CREDENTIALS,
       },
     });
+
+    setIo(this.io);
 
     this.initializeMiddlewares();
     this.initializeRoutes(routes);
@@ -120,7 +123,7 @@ export class App {
 
   private initializeRoutes(routes: Routes[]) {
     routes.forEach(route => {
-      this.app.use('/', route.router);
+      this.app.use(route.path, route.router);
     });
   }
 
@@ -179,6 +182,7 @@ export class App {
   }
 
   private initializeSocket() {
+    // Middleware d'authentification Socket.IO
     this.io.use((socket, next) => {
       socketAuthMiddleware(socket, err => {
         if (err) {
@@ -189,40 +193,54 @@ export class App {
       });
     });
 
+    // Connexion d'un utilisateur
     this.io.on('connection', socket => {
       const user = socket.data.user;
       console.log('✅ Un utilisateur est connecté :', user);
 
-      console.log(`${user.pseudo} s'est connecté(e)`);
-
+      // Pour debug
       socket.on('user-connected', (msg: string) => {
         console.log('🔔 Message reçu :', msg);
-
-        // Envoie ce message à tous les autres clients
         socket.broadcast.emit('user-connected', msg);
       });
 
       //  Quand un utilisateur rejoint une conversation
       socket.on('joinConversation', (conversationId: string) => {
-        socket.join(`conversation:${conversationId}`);
-        console.log(`👥 ${user} a rejoint la room conversation:${conversationId}`);
+        const roomName = `conversation:${conversationId}`;
+        socket.join(roomName);
+        console.log(`👥 ${user} a rejoint la room :${conversationId}`);
+
+        // notifier les autres membres de la room
+        socket.to(roomName).emit('userJoined', {
+          userId: user?.id,
+          message: `${user?.id} a rejoint la conversation.`,
+        });
       });
 
       // Quand un utilisateur quitte la conversation
       socket.on('leaveConversation', (conversationId: string) => {
-        socket.leave(`conversation:${conversationId}`);
+        const roomName = `conversation:${conversationId}`;
+        socket.leave(roomName);
         console.log(`👋 ${user} a quitté la room conversation:${conversationId}`);
       });
 
-      //Quand un message est reçu
-      socket.on('message', data => {
-        console.log('💬 Message reçu : ', data);
-        this.io.emit('message', data); // renvoie à tous
+      // Quand un message est envoyé dans une conversation
+      socket.on('sendMessage', ({ conversationId, message }) => {
+        const roomName = `conversation:${conversationId}`;
+        console.log(`💬 Nouveau message de ${user?.id} dans ${roomName} :`, message);
+
+        // Envoi du message uniquement aux membres de la room
+        this.io.to(roomName).emit('newMessage', {
+          userId: user?.id,
+          message,
+          conversationId,
+          createdAt: new Date(),
+        });
       });
 
       //Quand l'utilisateur se déconnecte
       socket.on('disconnect', reason => {
-        console.log(`${user.pseudo} s'est déconnecté(e), cause : ${reason}`);
+        console.log(`${user.id} s'est déconnecté(e), cause : ${reason}`);
       });
     });
   }

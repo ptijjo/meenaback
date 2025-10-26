@@ -5,9 +5,9 @@ import fs from 'fs/promises';
 import { RequestWithUser } from '../interfaces/auth.interface';
 
 
-const avatarFolder = join(__dirname, '..', '..', 'public', 'avatar');
+const avatarFolder = join(__dirname, '..', '..', 'public', 'avatarSecret');
 
-const resizeAvatar = async (req: RequestWithUser, res: Response, next: NextFunction) => {
+const resizeAvatarSecret = async (req: RequestWithUser, res: Response, next: NextFunction) => {
   if (!req.file) return next();
 
   try {
@@ -30,4 +30,4 @@ const resizeAvatar = async (req: RequestWithUser, res: Response, next: NextFunct
   }
 };
 
-export default resizeAvatar;
+export default resizeAvatarSecret;

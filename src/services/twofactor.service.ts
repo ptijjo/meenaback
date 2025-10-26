@@ -8,7 +8,7 @@ export class TwoFactorService {
   /**
    * Étape 1 — Génère une clé secrète + QR Code
    */
-  public async generateSecret(userId: string) {
+  public generateSecret = async (userId: string)=> {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new Error('Utilisateur non trouvé');
 
@@ -35,7 +35,7 @@ export class TwoFactorService {
   /**
    * Étape 2 — Vérifie le code TOTP saisi par l’utilisateur
    */
-  public async verifyCode(userId: string, code: string) {
+  public verifyCode = async (userId: string, code: string) =>{
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user || !user.twoFaSecret) throw new Error('2FA non configuré pour cet utilisateur');
 
@@ -49,15 +49,15 @@ export class TwoFactorService {
     if (!verified) throw new Error('Code TOTP invalide');
 
     // Si le code est valide, on active le 2FA
-    await prisma.user.update({
+    const updateUser = await prisma.user.update({
       where: { id: userId },
       data: { is2FaEnable: true },
     });
 
-    return true;
+    return updateUser;
   }
 
-  public async verifyLoginCode(userId: string, code: string) {
+  public verifyLoginCode = async (userId: string, code: string)=> {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user || !user.twoFaSecret) throw new Error('2FA non configuré pour cet utilisateur');
 

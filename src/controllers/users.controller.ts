@@ -6,9 +6,12 @@ import { RequestWithUser } from '../interfaces/auth.interface';
 import { UpdateUserDto } from '../dtos/users.dto';
 import { HttpException } from '../exceptions/httpException';
 import { Role } from '@prisma/client';
+import { UserSecretService } from '../services/userSecret.service';
+import { UserSecret } from '../interfaces/userSecret.interface';
 
 export class UserController {
   public user = Container.get(UserService);
+  
 
   public getUsers = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -74,4 +77,15 @@ export class UserController {
       next(error);
     }
   };
+
+  public findUserSecretByUserId = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const {userId} = req.body;
+      const findOneUserData: UserSecret = await this.user.findUserSecretByUserId(userId);
+
+      res.status(200).json({ data: findOneUserData, message: 'findOne' });
+    } catch (error) {
+      next(error)
+    }
+  }
 }

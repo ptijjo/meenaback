@@ -7,6 +7,7 @@ import { ValidationMiddleware } from '../middlewares/validation.middleware';
 import { authRateLimiter } from '../middlewares/rateLimit.middleware';
 import { CreateAuthDto } from '../dtos/auth.dto';
 import { RefreshTokenMiddleware } from '../middlewares/refreshToken.middleware';
+import { AuthSecretMiddleware } from '../middlewares/userSecret.middleware';
 
 export class AuthRoute implements Routes {
   public path = '/';
@@ -23,9 +24,9 @@ export class AuthRoute implements Routes {
     this.router.post(`${this.path}login`, ValidationMiddleware(CreateAuthDto), authRateLimiter, this.auth.logIn);
     this.router.post(`${this.path}login2fa`, this.auth.login2FA);
     this.router.post(`${this.path}2fa`, AuthMiddleware, this.auth.verify2FA);
-    this.router.get(`${this.path}logout`, this.auth.logOut);
+    this.router.get(`${this.path}logout`,AuthMiddleware,AuthSecretMiddleware, this.auth.logOut);
     this.router.get(`${this.path}logoutAll`, AuthMiddleware, this.auth.logOutAll);
-    this.router.get(`${this.path}connected`, AuthMiddleware, this.auth.whoIsLog);
+    this.router.get(`${this.path}connected`, AuthMiddleware,AuthSecretMiddleware, this.auth.whoIsLog);
     this.router.post(`${this.path}refresh`, RefreshTokenMiddleware, this.auth.refreshToken);
     this.router.post(`${this.path}desactivateAccount`, AuthMiddleware, this.auth.desactivateAccount);
     this.router.post(`${this.path}recuperationAccount`, AuthMiddleware, this.auth.recuperationAccount);

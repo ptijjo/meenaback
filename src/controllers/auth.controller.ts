@@ -10,10 +10,13 @@ import { HttpException } from '../exceptions/httpException';
 import { User } from '../interfaces/users.interface';
 import { cacheService } from '../server';
 import { TwoFactorService } from '../services/twofactor.service';
+import { UserSecret } from '../interfaces/userSecret.interface';
+import { UserSecretService } from '../services/userSecret.service';
 
 export class AuthController {
   public auth = Container.get(AuthService);
   public user = Container.get(UserService);
+  public userSecret = Container.get(UserSecretService);
   public doubleFa = Container.get(TwoFactorService);
 
   public signUp = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -29,7 +32,7 @@ export class AuthController {
 
   public verifyEmail = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const token = String(req.params.token);
-    console.log("token de vérification : ",token)
+    console.log('token de vérification : ', token);
     const result = await this.auth.verifyEmail(token);
     res.status(200).json(result);
   };
@@ -87,9 +90,11 @@ export class AuthController {
       if (!refreshToken) throw new HttpException(400, 'No refresh token provided');
 
       const { revoked, id } = await this.auth.logout(refreshToken);
+      const idSecret = req.userSecret.ID;
 
       //Suppression ciblée dans Redis
       await cacheService.del(`auth:${id}`);
+      await cacheService.del(`auth:${idSecret}`);
 
       // Supprimer les cookies
       res.setHeader('Set-Cookie', [
@@ -124,29 +129,42 @@ export class AuthController {
   };
 
   public whoIsLog = async (req: RequestWithUser, res: Response, next: NextFunction) => {
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({ message: 'Unauthorized: no valid token' });
-    }
-    const userId = req.user.id;
-    const cacheKey = `auth:${userId}`;
     try {
-      // 1. Essayer de récupérer le profil complet du cache
-      const cachedUser = await cacheService.get(cacheKey);
-
-      if (cachedUser) {
-        return res.status(200).json({ data: cachedUser }); // Cache Hit : Retour immédiat
+      // Vérification de la présence de l'utilisateur authentifié
+      if (!req.user?.id || !req.userSecret?.ID) {
+        return res.status(401).json({ message: 'Unauthorized: no valid token' });
       }
 
-      // 2. Cache Miss : Aller chercher dans la DB
-      const user: User = await this.user.findUserById(req.user.id);
+      const userId = req.user.id;
+      const userSecretId = req.userSecret.ID;
 
-      if (user) {
-        // 3. Mettre à jour le cache et retourner
-        await cacheService.set(cacheKey, user, 3600);
-        return res.status(200).json({ data: user });
+      const cacheKeyUser = `auth:${userId}`;
+      const cacheKeyUserSecret = `auth:${userSecretId}`;
+
+      // Tentative de lecture du cache
+      const [cachedUser, cachedUserSecret] = await Promise.all([cacheService.get(cacheKeyUser), cacheService.get(cacheKeyUserSecret)]);
+
+      // Si tout est déjà en cache → retour immédiat
+      if (cachedUser && cachedUserSecret) {
+        return res.status(200).json({
+          data: { user: cachedUser, userSecret: cachedUserSecret, fromCache: true },
+        });
       }
 
-      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+      // Sinon → on va chercher en base ce qui manque
+      const [user, userSecret] = await Promise.all([
+        cachedUser ? Promise.resolve(cachedUser) : this.user.findUserById(userId),
+        cachedUserSecret ? Promise.resolve(cachedUserSecret) : this.userSecret.findUserSecretById(userSecretId),
+      ]);
+
+      // On met à jour le cache si besoin
+      if (!cachedUser) await cacheService.set(cacheKeyUser, user, 3600);
+      if (!cachedUserSecret) await cacheService.set(cacheKeyUserSecret, userSecret, 3600);
+
+      // Réponse finale
+      return res.status(200).json({
+        data: { user, userSecret, fromCache: false },
+      });
     } catch (error) {
       next(error);
     }
@@ -192,19 +210,16 @@ export class AuthController {
 
   public recuperationAccount = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
     try {
-       const { idSecret } = req.body;
-    const userData = req.body;
+      const { idSecret } = req.body;
+      const userData = req.body;
 
-    const activate = await this.auth.recuperationAccount(userData, idSecret);
+      const activate = await this.auth.recuperationAccount(userData, idSecret);
 
-    res.status(200).json({message:"Votre compte est réactivé !", data:activate})
+      res.status(200).json({ message: 'Votre compte est réactivé !', data: activate });
     } catch (error) {
-      next(error)
+      next(error);
     }
-   
-  }
-
-  
+  };
 
   /** --------------------------------OAUTH--------------------------------------------------- */
 
@@ -279,7 +294,7 @@ export class AuthController {
     res.status(200).json({
       id: existingUser.id,
       email: existingUser.email,
-      secretName: existingUser.secretName,
+      name: existingUser.name,
       avatar: user.avatar,
     });
   };

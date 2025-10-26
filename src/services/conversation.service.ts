@@ -4,15 +4,21 @@ import { HttpException } from '../exceptions/httpException';
 
 @Service()
 export class ConversationService {
-  public async createConversation(userId: string, friendId: string) {
+  public createConversation = async (userSecretId: string, friendId: string) => {
+
+    
+
     //On vérifie si ils sont amis
+    if (!userSecretId || !friendId) {
+      throw new HttpException(400, 'userId ou friendId manquant');
+    }
+
     const isFriend = await prisma.friendship.findFirst({
       where: {
         OR: [
-          { requesterId: userId, addresseeId: friendId },
-          { requesterId: friendId, addresseeId: userId },
+          { requesterId: userSecretId, addresseeId: friendId, status: 'accepted' },
+          { requesterId: friendId, addresseeId: userSecretId, status: 'accepted' },
         ],
-        status: 'accepted',
       },
     });
 
@@ -24,7 +30,7 @@ export class ConversationService {
     const existing = await prisma.conversation.findFirst({
       where: {
         participants: {
-          every: { userId: { in: [userId, friendId] } },
+          some: { userId: { in: [userSecretId, friendId] } },
         },
       },
       include: { participants: true },
@@ -34,15 +40,38 @@ export class ConversationService {
 
     //sinon on crée la conversation
     const conversation = await prisma.conversation.create({
-        data: {
-          author:{connect:{ID:userId}}, // on connecte l'auteur
+      data: {
+        author: { connect: { ID: userSecretId } }, // on connecte l'auteur
         participants: {
-          create: [{ userId }, { userId: friendId }],
+          create: [{ userId:userSecretId }, { userId: friendId }],
         },
       },
       include: { participants: true },
     });
-      
-      return conversation;
+
+    return conversation;
+  };
+
+  public getConversationByUser = async (userSecretId: string) => {
+    let allConversation = await prisma.conversation.findFirst({
+      where: {
+        authorId: userSecretId,
+      },
+    });
+
+    if (!allConversation) throw new HttpException(409, 'Acune conversation pour le moment');
+
+    return allConversation;
+  };
+
+  public async getUserConversations(userSecretId: string) {
+    const conversations = await prisma.conversation.findMany({
+      where: {
+        participants: { some: { userId:userSecretId } },
+      },
+      include: { participants: true },
+    });
+
+    return conversations;
   }
 }

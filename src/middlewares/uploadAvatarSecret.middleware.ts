@@ -14,6 +14,6 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-const Avatar = multer({ storage, fileFilter }).single('avatar');
+const AvatarSecret = multer({ storage, fileFilter }).single('avatarSecret');
 
-export default Avatar;
+export default AvatarSecret;

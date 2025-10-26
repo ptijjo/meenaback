@@ -9,11 +9,14 @@ import path from 'path';
 import { cacheService } from '../server';
 import { Role } from '@prisma/client';
 import { TwoFactorService } from './twofactor.service';
+import { UserSecretService } from './userSecret.service';
+import { UserSecret } from '../interfaces/userSecret.interface';
 
 @Service()
 export class UserService {
   public user = prisma.user;
-  public doubleFa = Container.get(TwoFactorService);
+  private doubleFa = Container.get(TwoFactorService);
+  private userSecret = Container.get(UserSecretService);
 
   public async findAllUser(): Promise<User[]> {
     let allUser: User[] = await this.user.findMany({where:{desactivateAccountDate:null},
@@ -119,6 +122,13 @@ export class UserService {
 
     const deleteUserData = await this.user.delete({ where: { id: userId,desactivateAccountDate:null } });
     return deleteUserData;
+  }
+
+  public findUserSecretByUserId = async (userId:string): Promise<UserSecret> => {
+    const findUser: UserSecret = await this.userSecret.findUserSecretByUserId(userId);
+    if (!findUser) throw new HttpException(409, "User doesn't exist");
+
+    return findUser;
   }
  
 }

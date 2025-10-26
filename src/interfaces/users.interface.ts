@@ -4,7 +4,7 @@ export interface User {
   id: string;
   email: string;
   password?: string;
-  secretName: string;
+  name: string;
   phone?: string;
   phoneVerified?: boolean;
   googleId?: string;

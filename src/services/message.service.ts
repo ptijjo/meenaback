@@ -33,7 +33,14 @@ export class MessageService {
         senderId,
         content,
       },
-      include: { sender: true },
+      include: {
+        sender: {
+          include: {
+            user: {
+            select:{secretName:true}
+          }
+        }
+      }},
     });
 
     //On diffuse le message

@@ -1,5 +1,6 @@
 import { Request } from 'express';
 import { User } from './users.interface';
+import { UserSecret } from './userSecret.interface';
 
 
 export interface DataStoredInToken {
@@ -13,6 +14,7 @@ export interface TokenData {
 
 export interface RequestWithUser extends Request {
   user: User;
+  userSecret?: UserSecret;
   jti: string;
   logIn: any;
   isAuthenticated?: any;

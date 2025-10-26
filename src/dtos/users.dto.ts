@@ -27,7 +27,7 @@ export class CreateUserDto {
   @IsNotEmpty()
   @MinLength(1)
   @MaxLength(32)
-  public secretName: string;
+  public name: string;
 
 
   @IsOptional()
@@ -61,7 +61,7 @@ export class UpdateUserDto {
   @IsString()
   @MinLength(1)
   @MaxLength(32)
-  public secretName?: string;
+  public name?: string;
 
     @IsOptional()
   @IsString()

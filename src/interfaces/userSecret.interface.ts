@@ -1,5 +1,6 @@
 export interface UserSecret{
     userId: string;
-    name: string;
+    nameSecret: string;
+    avatarSecret: string;
     ID: string;
 }

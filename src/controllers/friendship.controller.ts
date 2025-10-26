@@ -10,8 +10,8 @@ export class FriendshipController {
     try {
       const friendId = req.body.friendId;
 
-      console.log(`userId:${req.user.id} et addresseeId:${friendId}`)
-      const friendship = await this.friendshipService.sendRequest(req.user.id, friendId);
+      console.log(`userId:${req.userSecret.ID} et addresseeId:${friendId}`)
+      const friendship = await this.friendshipService.sendRequest(req.userSecret.ID, friendId);
       res.status(201).json(friendship);
     } catch (error) {
       next(error);
@@ -21,7 +21,7 @@ export class FriendshipController {
   public acceptRequest = async (req: RequestWithUser, res: Response, next: NextFunction) => {
     try {
       const requesterId = req.body.requesterId;
-      const friendship = await this.friendshipService.acceptRequest(req.user.id, requesterId);
+      const friendship = await this.friendshipService.acceptRequest(req.userSecret.ID, requesterId);
       res.status(200).json(friendship);
     } catch (error) {
       next(error);
@@ -31,7 +31,7 @@ export class FriendshipController {
   public removeFriend = async (req: RequestWithUser, res: Response, next: NextFunction) => {
     try {
       const friendId = req.params.friendId;
-      const message = await this.friendshipService.rejectOrRemove(req.user.id, friendId);
+      const message = await this.friendshipService.rejectOrRemove(req.userSecret.ID, friendId);
       res.status(200).json(message);
     } catch (error) {
       next(error);
@@ -40,7 +40,10 @@ export class FriendshipController {
 
   public getFriends = async (req: RequestWithUser, res: Response, next: NextFunction) => {
     try {
-      const friends = await this.friendshipService.getFriends(req.user.id);
+      const userSecretId = req.userSecret.ID;
+      const friends = await this.friendshipService.getFriends(userSecretId);
+
+      console.log("liste d'ami : " , friends)
       res.status(200).json(friends);
     } catch (error) {
       next(error);
@@ -49,7 +52,7 @@ export class FriendshipController {
 
   public getPendingRequests = async (req: RequestWithUser, res: Response, next: NextFunction) => {
     try {
-      const requests = await this.friendshipService.getPendingRequests(req.user.id);
+      const requests = await this.friendshipService.getPendingRequests(req.userSecret.ID);
       res.status(200).json(requests);
     } catch (error) {
       next(error);

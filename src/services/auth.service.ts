@@ -11,7 +11,6 @@ import {
   MAX_ACTIVE_SESSIONS,
   NUMBER_OF_FAIL_BEFORE_LOCK,
   REFRESH_TOKEN_SECRET,
-  SECRET_KEY,
   TIME_LOCK,
   TWO_FA_SECRET_KEY,
   VERIFICATION_EMAIL_LINK,
@@ -23,8 +22,7 @@ import prisma from '../utils/prisma';
 import { generateId } from '../utils/generateId';
 import { TwoFactorService } from './twofactor.service';
 import { cacheService } from '../server';
-import e from 'cors';
-import { UserSecret } from '../interfaces/userSecret.interface';
+
 
 @Service()
 export class AuthService {
@@ -59,7 +57,8 @@ export class AuthService {
     // 5️⃣ Créer le secret associé
     await this.prisma.userSecret.create({
       data: {
-        name: createUserData.secretName,
+        nameSecret: createUserData.name,
+        avatarSecret:createUserData.avatar,
         user: { connect: { id: createUserData.id } },
         ID: generateId(9),
       },
@@ -198,7 +197,7 @@ export class AuthService {
           data: {
             email: userData.email,
             googleId: userData.googleId,
-            secretName: `user` + generateId(7),
+            name: `user` + generateId(7),
             isVerified: true,
             status:"onLine",
           },
@@ -206,7 +205,8 @@ export class AuthService {
 
         await this.prisma.userSecret.create({
           data: {
-            name: findUser.secretName,
+            nameSecret: findUser.name,
+            avatarSecret:findUser.avatar,
             user: { connect: { id: findUser.id } },
             ID: generateId(9),
           },

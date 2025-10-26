@@ -12,27 +12,17 @@ export class FriendshipService {
   public notification = Container.get(NotificationService);
 
   // Envoyer une demande d'ami
-  public async sendRequest(userId: string, addresseeId: string): Promise<Friendship> {
-    const requesterSecret = await prisma.userSecret.findUnique({
-      where: { userId: userId },
-    });
+  public async sendRequest(userSecretId: string, addresseeId: string): Promise<Friendship> {
+    
 
-    const addresseeExists = await prisma.userSecret.findUnique({ where: { ID: addresseeId } });
 
-    if (!requesterSecret) throw new HttpException(400, `UserSecret requesterId introuvable: ${requesterSecret}`);
-    if (!addresseeExists) throw new HttpException(400, `UserSecret addresseeId introuvable: ${addresseeId}`);
-
-    const requesterId = requesterSecret.ID;
-
-    console.log( "requesterId : ",requesterId)
-
-    if (requesterId === addresseeId) throw new HttpException(400, "Impossible de s'ajouter soi-même.");
+    if (userSecretId === addresseeId) throw new HttpException(400, "Impossible de s'ajouter soi-même.");
 
     const existing = await this.friendship.findFirst({
       where: {
         OR: [
-          { requesterId, addresseeId },
-          { requesterId: addresseeId, addresseeId: requesterId },
+          { requesterId:userSecretId, addresseeId },
+          { requesterId: addresseeId, addresseeId: userSecretId },
         ],
       },
     });
@@ -41,7 +31,7 @@ export class FriendshipService {
 
     const friendship = await this.friendship.create({
       data: {
-        requester: { connect: { ID: requesterId } },
+        requester: { connect: { ID: userSecretId } },
         addressee: { connect: { ID: addresseeId } },
         status: 'pending',
       },
@@ -55,7 +45,7 @@ export class FriendshipService {
     await this.notification.notifyFriendRequest(
       notificationData,
       friendship.id,
-      requesterId, // sender = UserSecret du demandeur
+      userSecretId, // sender = UserSecret du demandeur
       addresseeId, // receiver = UserSecret du destinataire
     );
 
@@ -63,13 +53,10 @@ export class FriendshipService {
   }
 
   // Accepter une demande
-  public async acceptRequest(userId: string, requesterId: string): Promise<Friendship> {
-    const userSecret = await prisma.userSecret.findUnique({ where: { userId: userId } });
-
-    if (!userSecret) throw new HttpException(404, 'Demande introuvable.');
-
+  public async acceptRequest(addresseeId: string, requesterId: string): Promise<Friendship> {
+   
     const friendship = await this.friendship.findFirst({
-      where: { requesterId, addresseeId: userSecret.ID, status: 'pending' },
+      where: { requesterId, addresseeId, status: 'pending' },
     });
 
     if (!friendship) throw new HttpException(404, 'Demande d amitié introuvable.');
@@ -84,22 +71,19 @@ export class FriendshipService {
     const notificationData: CreateNotificationDto = { type, targetType };
 
     // Notification de demande d'ami
-    await this.notification.notifyFriendAccept(notificationData, friendship.id, userSecret.ID, requesterId);
+    await this.notification.notifyFriendAccept(notificationData, friendship.id, addresseeId, requesterId);
 
     return response;
   }
 
   // Refuser ou supprimer une demande
-  public async rejectOrRemove(userId: string, friendId: string): Promise<{ message: string }> {
-    const userSecret = await prisma.userSecret.findUnique({ where: { userId: userId } });
-
-    if (!userSecret) throw new HttpException(404, 'Demande introuvable.');
-
+  public async rejectOrRemove(userSecretId: string, friendId: string): Promise<{ message: string }> {
+   
     const friendship = await this.friendship.findFirst({
       where: {
         OR: [
-          { requesterId: userSecret.ID, addresseeId: friendId },
-          { requesterId: friendId, addresseeId: userSecret.ID },
+          { requesterId: userSecretId, addresseeId: friendId },
+          { requesterId: friendId, addresseeId: userSecretId },
         ],
       },
     });
@@ -112,15 +96,12 @@ export class FriendshipService {
   }
 
   // Liste d'amis
-  public async getFriends(userId: string): Promise<any> {
-    const userSecret = await prisma.userSecret.findUnique({ where: { userId: userId } });
-
-    if (!userSecret) throw new HttpException(404, 'Demande introuvable.');
+  public async getFriends(userSecretId: string): Promise<any> {
 
     const friendships = await this.friendship.findMany({
       where: {
         status: FriendshipStatus.accepted,
-        OR: [{ requesterId: userSecret.ID }, { addresseeId: userSecret.ID }],
+        OR: [{ requesterId: userSecretId }, { addresseeId: userSecretId }],
       },
       include: {
         requester: { include: { user: true } }, // on récupère aussi les infos du User
@@ -128,28 +109,25 @@ export class FriendshipService {
       },
     });
 
-    friendships.map(f => {
-      const isRequester = f.requesterId === userSecret.ID;
+    const friendsList = friendships.map(f => {
+      const isRequester = f.requesterId === userSecretId;
       const friend = isRequester ? f.addressee : f.requester; // <-- UserSecret
       return {
         id: friend.ID, // identifiant public (UserSecret.ID)
         name: friend.name, // pseudo public
         avatar: friend.user.avatar, // vient de User
-        email: friend.user.email,
         status: friend.user.status,
         since: f.updatedAt,
       };
     });
+    return friendsList;
   }
 
   // Liste des demandes reçues
-  public async getPendingRequests(userId: string): Promise<Friendship[]> {
-    const userSecret = await prisma.userSecret.findUnique({ where: { userId: userId } });
-
-    if (!userSecret) throw new HttpException(404, 'Demande introuvable.');
+  public async getPendingRequests(userSecretId: string): Promise<Friendship[]> {
 
     return await this.friendship.findMany({
-      where: { addresseeId: userSecret.ID, status: FriendshipStatus.pending },
+      where: { addresseeId: userSecretId, status: FriendshipStatus.pending },
       include: { requester: true },
     });
   }

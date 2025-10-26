@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { Routes } from '../interfaces/routes.interface';
 import { AuthMiddleware } from '../middlewares/auth.middleware';
 import { MessageController } from '../controllers/message.controller';
-
+import { AuthSecretMiddleware } from '../middlewares/userSecret.middleware';
 
 export class MessageRoute implements Routes {
   public path = '/messages';
@@ -14,7 +14,7 @@ export class MessageRoute implements Routes {
   }
 
   private initializeRoutes() {
-    this.router.post(`${this.path}`, AuthMiddleware, this.message.createMessage);
-    this.router.get(`${this.path}/:id`, AuthMiddleware, this.message.findAll);
+    this.router.post(`/`, AuthMiddleware, AuthSecretMiddleware, this.message.createMessage);
+    this.router.get(`/:id`, AuthMiddleware, AuthSecretMiddleware, this.message.findAll);
   }
 }

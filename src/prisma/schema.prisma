@@ -66,7 +66,7 @@ model User {
   id                     String     @id @default(cuid())
   email                  String     @unique
   password               String?
-  secretName             String
+  name                   String
   phone                  String?
   phoneVerified          Boolean    @default(false)
   googleId               String?    @unique
@@ -92,29 +92,29 @@ model User {
   Session       Session[]
   UserSecret    UserSecret?
   LoginAttempts LoginAttempts[]
- 
 }
 
 // ======================================
 // 🔐 AUTH RELATIONS
 // ======================================
 model UserSecret {
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name   String
-  ID     String @id @unique
+  userId       String @unique
+  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nameSecret   String
+  avatarSecret String
+  ID           String @id @unique
 
   // Relations
-  DemandeurAmi          Friendship[]   @relation("FriendRequester")
-  ReceveurAmi           Friendship[]   @relation("FriendAddressee")
-  notificationReceveur  Notification[] @relation(name: "receveur")
-  notificationDemandeur Notification[] @relation(name: "demandeur")
-  conversationsCreated Conversation[]            @relation("UserCreatedConversations")
-  conversations        ConversationParticipant[]
-   // Groupes & Chat
-  groupsCreated        Group[]                   @relation("UserCreatedGroups")
-  groupMembers         GroupMember[]
-  messages             Message[]
+  DemandeurAmi          Friendship[]              @relation("FriendRequester")
+  ReceveurAmi           Friendship[]              @relation("FriendAddressee")
+  notificationReceveur  Notification[]            @relation(name: "receveur")
+  notificationDemandeur Notification[]            @relation(name: "demandeur")
+  conversationsCreated  Conversation[]            @relation("UserCreatedConversations")
+  conversations         ConversationParticipant[]
+  // Groupes & Chat
+  groupsCreated         Group[]                   @relation("UserCreatedGroups")
+  groupMembers          GroupMember[]
+  messages              Message[]
 }
 
 model LoginHistory {
@@ -151,13 +151,13 @@ model LoginAttempts {
 // 💬 GROUP SYSTEM
 // ======================================
 model Group {
-  id          String   @id @default(cuid())
+  id          String     @id @default(cuid())
   name        String
   description String
   createdById String
-  createdBy   UserSecret     @relation("UserCreatedGroups", fields: [createdById], references: [ID])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdBy   UserSecret @relation("UserCreatedGroups", fields: [createdById], references: [ID])
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
   members       GroupMember[]
   conversations Conversation[]
@@ -170,8 +170,8 @@ model GroupMember {
   role     RoleGroup @default(member)
   joinedAt DateTime  @default(now())
 
-  user  UserSecret  @relation(fields: [userId], references: [ID])
-  group Group @relation(fields: [groupId], references: [id])
+  user  UserSecret @relation(fields: [userId], references: [ID])
+  group Group      @relation(fields: [groupId], references: [id])
 
   @@unique([userId, groupId])
 }
@@ -194,16 +194,16 @@ model Friendship {
 // 💭 CONVERSATION SYSTEM
 // ======================================
 model Conversation {
-  id        String   @id @default(cuid())
-  isGroup   Boolean  @default(false)
+  id        String     @id @default(cuid())
+  isGroup   Boolean    @default(false)
   groupId   String?
-  group     Group?   @relation(fields: [groupId], references: [id])
+  group     Group?     @relation(fields: [groupId], references: [id])
   name      String?
   avatar    String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
   authorId  String
-  author    UserSecret     @relation("UserCreatedConversations", fields: [authorId], references: [ID])
+  author    UserSecret @relation("UserCreatedConversations", fields: [authorId], references: [ID])
 
   participants ConversationParticipant[]
   messages     Message[]
@@ -219,7 +219,7 @@ model ConversationParticipant {
   joinedAt       DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  user         UserSecret         @relation(fields: [userId], references: [ID])
+  user         UserSecret   @relation(fields: [userId], references: [ID])
   conversation Conversation @relation(fields: [conversationId], references: [id])
 
   @@unique([userId, conversationId])
@@ -240,7 +240,7 @@ model Message {
   senderId       String
   conversationId String
 
-  sender       UserSecret         @relation(fields: [senderId], references: [ID])
+  sender       UserSecret   @relation(fields: [senderId], references: [ID])
   conversation Conversation @relation(fields: [conversationId], references: [id])
 
   @@index([senderId])
