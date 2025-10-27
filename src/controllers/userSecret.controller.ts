@@ -9,7 +9,6 @@ import { UpdateUserSecretDto } from '../dtos/userSecrets.dto';
 
 export class UserSecretController {
   public userSecret = Container.get(UserSecretService);
-  
 
   public getUsers = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -33,7 +32,7 @@ export class UserSecretController {
 
   public getUserByIdBody = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const {userId} = req.body;
+      const { userId } = req.body;
       const findOneUserSecretData: UserSecret = await this.userSecret.findUserSecretById(userId);
 
       res.status(200).json({ data: findOneUserSecretData, message: 'findOne' });
@@ -44,27 +43,22 @@ export class UserSecretController {
 
   public updateUser = async (req: RequestWithUser, res: Response, next: NextFunction) => {
     try {
-        const authorId = String(req.params.id);
-        const userSecretId = String(req.userSecret.ID);
-        const authorRole = String(req.user.role);
-     
+      const authorId = String(req.params.id);
+      const userSecretId = String(req.userSecret.ID);
+      const authorRole = String(req.user.role);
       const userData: UpdateUserSecretDto = req.body;
-      console.log(userData)
 
       if (userSecretId !== authorId && authorRole === Role.user) {
         throw new HttpException(404, 'Opération impossible');
       }
 
       if (req.file && req.file?.filename) {
-
         delete (req.body as any).avatar;
-        
+
         const url = `${req.protocol}://${req.get('host')}/public/avatarSecret/${req.file.filename}`;
         userData.avatarSecret = url;
-        console.log("✅ Nouvel avatar reçu :", url);
       }
 
-      console.log("🧠 Données envoyées au service :", userData);
       const updateUserSecretData = await this.userSecret.updateUserSecret(userSecretId, userData);
 
       return res.status(200).json({ data: updateUserSecretData, message: 'updated' });
@@ -72,5 +66,4 @@ export class UserSecretController {
       next(error);
     }
   };
-
 }

@@ -3,6 +3,8 @@ import { HttpException } from '../exceptions/httpException';
 import { RequestWithUser,} from '../interfaces/auth.interface';
 import prisma from '../utils/prisma';
 
+
+// Calcule la durée de vie du cache une seule fois
 export const AuthSecretMiddleware = async (req: RequestWithUser, res: Response, next: NextFunction) => {
   try {
 
@@ -11,6 +13,7 @@ export const AuthSecretMiddleware = async (req: RequestWithUser, res: Response, 
     }
 
     const userId = req.user.id;
+    
 
     const findUserSecret = await prisma.userSecret.findUnique({ where: { userId: String(userId) } });
 

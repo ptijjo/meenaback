@@ -6,7 +6,6 @@ import { RequestWithUser } from '../interfaces/auth.interface';
 import { UpdateUserDto } from '../dtos/users.dto';
 import { HttpException } from '../exceptions/httpException';
 import { Role } from '@prisma/client';
-import { UserSecretService } from '../services/userSecret.service';
 import { UserSecret } from '../interfaces/userSecret.interface';
 
 export class UserController {
@@ -54,10 +53,8 @@ export class UserController {
         
         const url = `${req.protocol}://${req.get('host')}/public/avatar/${req.file.filename}`;
         userData.avatar = url;
-        console.log("✅ Nouvel avatar reçu :", url);
       }
 
-      console.log("🧠 Données envoyées au service :", userData);
       const updateUserData = await this.user.updateUser(authorId, userData);
 
       return res.status(200).json({ data: updateUserData, message: 'updated' });

@@ -5,6 +5,7 @@ import prisma from '../utils/prisma';
 import { UpdateUserSecretDto } from '../dtos/userSecrets.dto';
 import safeDelete from '../utils/safeDeleteFilePath';
 import path from 'path';
+import { cacheService } from '../server';
 
 @Service()
 export class UserSecretService {
