@@ -5,6 +5,7 @@ import { HttpException } from '../exceptions/httpException';
 import { CreateNotificationDto } from '../dtos/notifications.dto';
 import { FriendshipStatus, NotifiableType, NotificationType } from '@prisma/client';
 import { NotificationService } from './notification.service';
+import { socketInstance } from '../server';
 
 @Service()
 export class FriendshipService {
@@ -42,13 +43,16 @@ export class FriendshipService {
     const notificationData: CreateNotificationDto = { type, targetType };
 
     // Notification de demande d'ami
-    await this.notification.notifyFriendRequest(
+    const notif = await this.notification.notifyFriendRequest(
       notificationData,
       friendship.id,
       userSecretId, // sender = UserSecret du demandeur
       addresseeId, // receiver = UserSecret du destinataire
     );
 
+    // 🔥 Envoi instantané au navigateur du destinataire
+    console.log("🔥 Notification envoyée à :", addresseeId);
+    socketInstance.to(`user:${addresseeId}`).emit('newNotification', notif);
     return friendship;
   }
 
@@ -113,9 +117,9 @@ export class FriendshipService {
       const isRequester = f.requesterId === userSecretId;
       const friend = isRequester ? f.addressee : f.requester; // <-- UserSecret
       return {
-        id: friend.ID, // identifiant public (UserSecret.ID)
-        name: friend.name, // pseudo public
-        avatar: friend.user.avatar, // vient de User
+        id: friend.ID, // identifiant privé (UserSecret.ID)
+        name: friend.nameSecret, 
+        avatar: friend.avatarSecret, 
         status: friend.user.status,
         since: f.updatedAt,
       };

@@ -18,5 +18,6 @@ export class TwoFaRoute implements Routes {
     this.router.post('/setup', AuthMiddleware, this.controller.generate);
     // Étape 2 : validation du code
     this.router.post('/verify', AuthMiddleware, this.controller.verify);
+    this.router.patch('/desactivate2FA', AuthMiddleware, this.controller.desactivate2FA);
   }
 }

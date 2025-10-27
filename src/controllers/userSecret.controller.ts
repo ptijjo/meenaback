@@ -31,6 +31,17 @@ export class UserSecretController {
     }
   };
 
+  public getUserByIdBody = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const {userId} = req.body;
+      const findOneUserSecretData: UserSecret = await this.userSecret.findUserSecretById(userId);
+
+      res.status(200).json({ data: findOneUserSecretData, message: 'findOne' });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   public updateUser = async (req: RequestWithUser, res: Response, next: NextFunction) => {
     try {
         const authorId = String(req.params.id);

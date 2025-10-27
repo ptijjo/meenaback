@@ -2,6 +2,7 @@ import speakeasy from 'speakeasy';
 import QRCode from 'qrcode';
 import prisma from '../utils/prisma';
 import { Service } from 'typedi';
+import { User } from '../interfaces/users.interface';
 
 @Service()
 export class TwoFactorService {
@@ -71,5 +72,17 @@ export class TwoFactorService {
     if (!verified) throw new Error('Code TOTP invalide');
 
     return user
+  }
+
+  public descativate2FA = async (userId: string):Promise<User> => {
+       const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.twoFaSecret) throw new Error('2FA non configuré pour cet utilisateur');
+
+    const update = await prisma.user.update({ where: { id: userId }, data:{
+      is2FaEnable:false
+    }
+    })
+    
+    return update;
   }
 }

@@ -33,4 +33,17 @@ public twoFactorService = Container.get(TwoFactorService);
       next(error);
     }
   };
+
+  public desactivate2FA = async (req: RequestWithUser, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.user.id;
+
+      const update = await this.twoFactorService.descativate2FA(userId);
+
+      res.status(200).json({message:"Double  FA désactivée",data:update})
+
+    } catch (error) {
+      next(error)
+    }
+  }
 }

@@ -9,5 +9,6 @@ export interface Message {
   createdAt: Date;
   updatedAt: Date;
   senderId: string;
+  receiverId: string;
   conversationId: string;
 }

@@ -10,37 +10,31 @@ import { ConversationService } from './conversation.service';
 export class MessageService {
   private conversation = Container.get(ConversationService);
 
-  public async createMessage(senderId: string, receiverId: string, content: string) {
+  public async createMessage(senderId: string, conversationId: string, content: string) {
+    if (!senderId || !conversationId || !content) {
+      throw new HttpException(400, 'Données incomplètes pour envoyer le message');
+    }
+
     //verifier si la conversation existe
-    const conversation: Conversation = await this.conversation.createConversation(senderId, receiverId);
+    const conversation = await prisma.conversation.findUnique({ where: { id: conversationId }, include: { participants: true } });
+
+    if (!conversation) throw new HttpException(404, 'Conversation introuvable');
 
     // Vérifie si le user fait bien partie de cette conversation
-    const isParticipant = await prisma.conversation.findFirst({
-      where: {
-        id: conversation.id,
-        participants: {
-          some: { userId: senderId },
-        },
-      },
-    });
-
+    const isParticipant = conversation.participants.some(p => p.userId === senderId);
     if (!isParticipant) throw new HttpException(401, 'Vous ne pouvez pas envoyer de message dans une conversation dont vous ne faites pas partie!');
+
+    const receiver = conversation.participants.find(p => p.userId !== senderId);
+    if (!receiver) throw new HttpException(400, 'Aucun destinataire trouvé dans la conversation');
 
     //Creation du message
     const message: Message = await prisma.message.create({
       data: {
-        conversationId:conversation.id,
+        conversationId: conversation.id,
         senderId,
+        receiverId:receiver.userId,
         content,
       },
-      include: {
-        sender: {
-          include: {
-            user: {
-            select:{secretName:true}
-          }
-        }
-      }},
     });
 
     //On diffuse le message

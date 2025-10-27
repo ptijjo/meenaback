@@ -19,23 +19,23 @@ export class AuthRoute implements Routes {
   }
 
   private initializeRoutes() {
-    this.router.post(`${this.path}signup`, ValidationMiddleware(CreateUserDto), authRateLimiter, this.auth.signUp);
-    this.router.get(`${this.path}verify-email/:token`, this.auth.verifyEmail);
-    this.router.post(`${this.path}login`, ValidationMiddleware(CreateAuthDto), authRateLimiter, this.auth.logIn);
-    this.router.post(`${this.path}login2fa`, this.auth.login2FA);
-    this.router.post(`${this.path}2fa`, AuthMiddleware, this.auth.verify2FA);
-    this.router.get(`${this.path}logout`,AuthMiddleware,AuthSecretMiddleware, this.auth.logOut);
-    this.router.get(`${this.path}logoutAll`, AuthMiddleware, this.auth.logOutAll);
-    this.router.get(`${this.path}connected`, AuthMiddleware,AuthSecretMiddleware, this.auth.whoIsLog);
-    this.router.post(`${this.path}refresh`, RefreshTokenMiddleware, this.auth.refreshToken);
-    this.router.post(`${this.path}desactivateAccount`, AuthMiddleware, this.auth.desactivateAccount);
-    this.router.post(`${this.path}recuperationAccount`, AuthMiddleware, this.auth.recuperationAccount);
+    this.router.post(`/signup`, ValidationMiddleware(CreateUserDto), authRateLimiter, this.auth.signUp);
+    this.router.get(`/verify-email/:token`, this.auth.verifyEmail);
+    this.router.post(`/login`, ValidationMiddleware(CreateAuthDto), authRateLimiter, this.auth.logIn);
+    this.router.post(`/login2fa`, this.auth.login2FA);
+    this.router.post(`/2fa`, AuthMiddleware, this.auth.verify2FA);
+    this.router.get(`/logout`,AuthMiddleware,AuthSecretMiddleware, this.auth.logOut);
+    this.router.get(`/logoutAll`, AuthMiddleware, this.auth.logOutAll);
+    this.router.get(`/connected`, AuthMiddleware,AuthSecretMiddleware, this.auth.whoIsLog);
+    this.router.post(`/refresh`, RefreshTokenMiddleware, this.auth.refreshToken);
+    this.router.post(`/desactivateAccount`, AuthMiddleware, this.auth.desactivateAccount);
+    this.router.post(`/recuperationAccount`, AuthMiddleware, this.auth.recuperationAccount);
     
   
     //***--------------------------------------oauth Googole---------------------------------------------------***
-    this.router.get(`${this.path}`, this.auth.homeOauth);
-    this.router.get(`${this.path}auth/google`, this.auth.googleAuth);
-    this.router.get(`${this.path}auth/google/callback`, this.auth.googleAuthCallback);
-    this.router.get(`${this.path}profile`, this.auth.controlProfil);
+    this.router.get(`/`, this.auth.homeOauth);
+    this.router.get(`/auth/google`, this.auth.googleAuth);
+    this.router.get(`/auth/google/callback`, this.auth.googleAuthCallback);
+    this.router.get(`/profile`, this.auth.controlProfil);
   }
 }

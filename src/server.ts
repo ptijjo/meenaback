@@ -4,6 +4,7 @@ import { AuthRoute } from './routes/auth.route';
 import { ConversationRoute } from './routes/conversation.route';
 import { FriendshipRoute } from './routes/friendship.route';
 import { MessageRoute } from './routes/message.route';
+import { NotificationRoute } from './routes/notification.route';
 import { TwoFaRoute } from './routes/twofactor.route';
 import { UserRoute } from './routes/users.route';
 import { UserSecretRoute } from './routes/userSecret.route';
@@ -11,7 +12,7 @@ import { ValidateEnv } from './utils/validateEnv';
 
 ValidateEnv();
 
-const app = new App([new UserRoute(), new AuthRoute(), new FriendshipRoute(), new TwoFaRoute(), new MessageRoute(), new ConversationRoute(),new UserSecretRoute()]);
+const app = new App([new UserRoute(), new AuthRoute(), new FriendshipRoute(), new TwoFaRoute(), new MessageRoute(), new ConversationRoute(),new UserSecretRoute(), new NotificationRoute()]);
 
 app.listen();
 

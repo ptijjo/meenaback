@@ -186,7 +186,7 @@ export class App {
     this.io.use((socket, next) => {
       socketAuthMiddleware(socket, err => {
         if (err) {
-          console.error(`⚠️ Auth échouée pour socket ${socket.id}: ${err.message}`);
+          console.error(`⚠️ Auth échouée pour socket ${socket.ID}: ${err.message}`);
           return next(err);
         }
         next();
@@ -198,6 +198,15 @@ export class App {
       const user = socket.data.user;
       console.log('✅ Un utilisateur est connecté :', user);
 
+      /**
+     **Chaque utilisateur rejoint sa "room privée"
+     * pour recevoir ses notifications en direct.
+     */
+       if (user?.ID) {
+        socket.join(`user:${user.ID}`);
+        console.log(`📦 ${user.ID} a rejoint sa room personnelle : user:${user.ID}`);
+      }
+
       // Pour debug
       socket.on('user-connected', (msg: string) => {
         console.log('🔔 Message reçu :', msg);
@@ -208,12 +217,12 @@ export class App {
       socket.on('joinConversation', (conversationId: string) => {
         const roomName = `conversation:${conversationId}`;
         socket.join(roomName);
-        console.log(`👥 ${user} a rejoint la room :${conversationId}`);
+       console.log(`💬 ${user?.friendId || user?.ID} a rejoint la room ${roomName}`);
 
         // notifier les autres membres de la room
         socket.to(roomName).emit('userJoined', {
-          userId: user?.id,
-          message: `${user?.id} a rejoint la conversation.`,
+          userId: user?.ID,
+          message: `${user?.ID} a rejoint la conversation.`,
         });
       });
 
@@ -227,20 +236,27 @@ export class App {
       // Quand un message est envoyé dans une conversation
       socket.on('sendMessage', ({ conversationId, message }) => {
         const roomName = `conversation:${conversationId}`;
-        console.log(`💬 Nouveau message de ${user?.id} dans ${roomName} :`, message);
+        console.log(`🗨️ Message de ${user?.friendId || user?.ID} dans ${roomName} :`, message)
 
         // Envoi du message uniquement aux membres de la room
         this.io.to(roomName).emit('newMessage', {
-          userId: user?.id,
+          userId: user?.nameSecret,
           message,
           conversationId,
           createdAt: new Date(),
         });
       });
 
+      //Envoi des notifications au front
+      socket.on("sendNotification", ({ receiverId, notification }) => {
+        const roomName = `user:${receiverId}`;
+        console.log(`Envoi d'une notif à ${receiverId} : `, notification);
+        this.io.to(roomName).emit('newNotification', notification);
+      });
+
       //Quand l'utilisateur se déconnecte
       socket.on('disconnect', reason => {
-        console.log(`${user.id} s'est déconnecté(e), cause : ${reason}`);
+        console.log(`${user.ID} s'est déconnecté(e), cause : ${reason}`);
       });
     });
   }

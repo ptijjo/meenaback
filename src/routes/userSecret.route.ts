@@ -20,6 +20,7 @@ export class UserSecretRoute implements Routes {
   private initializeRoutes() {
     this.router.get(`/`, AuthMiddleware, AuthSecretMiddleware,RoleGuard([Role.admin, Role.modo]), this.user.getUsers);
     this.router.get(`/:id`, AuthMiddleware, AuthSecretMiddleware,RoleGuard([Role.admin, Role.modo]), this.user.getUserById);
+    this.router.post(`/`, AuthMiddleware, AuthSecretMiddleware,RoleGuard([]), this.user.getUserByIdBody);
     this.router.patch(`/:id`, AuthMiddleware, AuthSecretMiddleware, AvatarSecret, resizeAvatarSecret, this.user.updateUser);
     
   }

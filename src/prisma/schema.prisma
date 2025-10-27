@@ -115,6 +115,7 @@ model UserSecret {
   groupsCreated         Group[]                   @relation("UserCreatedGroups")
   groupMembers          GroupMember[]
   messages              Message[]
+  message               Message[]                 @relation("ReceivedMessages")
 }
 
 model LoginHistory {
@@ -229,19 +230,20 @@ model ConversationParticipant {
 // 📨 MESSAGES
 // ======================================
 model Message {
-  id            String      @id @default(cuid())
-  content       String
-  type          TypeMessage @default(TEXT)
-  attachmentUrl String?
-  read          Boolean     @default(false)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-
+  id             String      @id @default(cuid())
+  content        String
+  type           TypeMessage @default(TEXT)
+  attachmentUrl  String?
+  read           Boolean     @default(false)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  receiverId     String
   senderId       String
   conversationId String
 
   sender       UserSecret   @relation(fields: [senderId], references: [ID])
   conversation Conversation @relation(fields: [conversationId], references: [id])
+  receiver     UserSecret   @relation("ReceivedMessages", fields: [receiverId], references: [ID])
 
   @@index([senderId])
   @@index([conversationId])
