@@ -250,7 +250,7 @@ export class AuthController {
 
           const authData: CreateAuthDto = { email, googleId };
 
-          // 🔥 Utilisation de ton service d’auth
+          // 🔥 Utilisation de ton service d'auth
           const { cookie, accessToken } = await this.auth.login(authData, ipAddress, userAgent);
 
           // ✅ Ajout des cookies manquants
