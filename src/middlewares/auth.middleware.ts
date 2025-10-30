@@ -25,7 +25,6 @@ export const AuthMiddleware = async (req: RequestWithUser, res: Response, next: 
 
     // 1. Décode le JWT pour obtenir l'ID (cela gère les erreurs de signature/expiration)
     const decoded = verify(Authorization, String(SECRET_KEY)) as DataStoredInToken;
-    console.log("lecture du token",decoded)
     const userId = decoded.id;
 
     // 2. Nouvelle clé de cache : basée sur l'ID utilisateur

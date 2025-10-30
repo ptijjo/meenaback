@@ -50,8 +50,8 @@ export class FriendshipService {
       addresseeId, // receiver = UserSecret du destinataire
     );
 
-    // 🔥 Envoi instantané au navigateur du destinataire
-    console.log("🔥 Notification envoyée à :", addresseeId);
+    //  Envoi instantané au navigateur du destinataire
+    console.log(" Notification envoyée à :", addresseeId);
     socketInstance.to(`user:${addresseeId}`).emit('newNotification', notif);
     return friendship;
   }
@@ -75,8 +75,11 @@ export class FriendshipService {
     const notificationData: CreateNotificationDto = { type, targetType };
 
     // Notification de demande d'ami
-    await this.notification.notifyFriendAccept(notificationData, friendship.id, addresseeId, requesterId);
+    const notif = await this.notification.notifyFriendAccept(notificationData, friendship.id, addresseeId, requesterId);
 
+     //  Envoi instantané au navigateur du destinataire
+    console.log(" Notification envoyée à :", requesterId);
+    socketInstance.to(`user:${requesterId}`).emit('newNotification', notif);
     return response;
   }
 

@@ -6,18 +6,15 @@ import { UserSecretService } from '../services/userSecret.service';
 import { Conversation } from '../interfaces/conversation.interface';
 
 export class ConversationController {
-    private conversationService = Container.get(ConversationService);
-    private userSecretService = Container.get(UserSecretService);
+  private conversationService = Container.get(ConversationService);
+  
 
   public createConversation = async (req: RequestWithUser, res: Response, next: NextFunction) => {
     try {
-        const { friendId } = req.body;
-        const userId = req.userSecret.ID
-
-       console.log("🧩 [createConversation] friendId:", friendId, "userId:", userId);
+      const { friendId } = req.body;
+      const userId = req.userSecret.ID;
 
       const conversation = await this.conversationService.createConversation(userId, friendId);
-      console.log("✅ Conversation créée :", conversation);
       res.status(201).json({ data: conversation });
     } catch (error) {
       next(error);
@@ -38,11 +35,21 @@ export class ConversationController {
     try {
       const conversationId = String(req.params.id);
       const conversation: Conversation = await this.conversationService.getConversationById(conversationId);
-      res.status(200).json({message:"Find conversation",data:conversation})
+      res.status(200).json({ message: 'Find conversation', data: conversation });
     } catch (error) {
-      next(error)
+      next(error);
     }
-    const conversationId = String(req.params.id);
-    const conversation:Conversation = await this.conversationService.getConversationById(conversationId)
-  }
+  };
+
+  public findConversationByFriendId = async (req: RequestWithUser, res: Response, next: NextFunction) => {
+    try {
+      const userSecretId = req.userSecret.ID;
+      const friendId = req.params.friendId;
+      const existing = await this.conversationService.findConversationByFriendId(userSecretId, friendId);
+      
+      res.status(200).json({ message: "Conversation chat", data: existing });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

@@ -12,9 +12,11 @@ export const socketAuthMiddleware = async (socket: Socket, next: (err?: Error) =
   }
 
   try {
-    const decoded = jwt.verify(token, String(SECRET_KEY))as DataStoredInToken;
+    const decoded = jwt.verify(token, String(SECRET_KEY)) as DataStoredInToken;
     const userSecret = await prisma.userSecret.findUnique({ where: { userId: decoded.id } });
     socket.data.user = userSecret;
+    console.log("🧩 Auth handshake reçu :", socket.handshake.auth);
+
     next();
   } catch (error) {
    console.error("❌ Erreur socket JWT :", error.message);

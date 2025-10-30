@@ -14,13 +14,13 @@ export class MessageController {
       const userId = req.userSecret.ID;
       const { conversationId, content } = req.body;
 
-      console.log('🔍 Conversation check:', { userId, conversationId });
-
       const message = await this.messageService.createMessage(userId, conversationId, content);
 
       // Diffuse le message dans la room correspondante
       const io = getIo();
-      io.to(`conversation:${message.conversationId}`).emit('newMessage', message);
+      const roomName = `conversation:${message.conversationId}`;
+      console.log(`✅ Tentative de diffusion du message ${message.id} dans la room : ${roomName}`);
+      io.to(roomName).emit('newMessage', message);
 
       res.status(201).json({ status: 'Message crée', data: message });
     } catch (error) {

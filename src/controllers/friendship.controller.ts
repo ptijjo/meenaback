@@ -43,7 +43,6 @@ export class FriendshipController {
       const userSecretId = req.userSecret.ID;
       const friends = await this.friendshipService.getFriends(userSecretId);
 
-      console.log("liste d'ami : " , friends)
       res.status(200).json(friends);
     } catch (error) {
       next(error);

@@ -16,6 +16,7 @@ export class ConversationRoute implements Routes {
   private initializeRoutes() {
     // Création ou récupération d'une conversation
     this.router.post(`/`, AuthMiddleware,AuthSecretMiddleware, this.conversationController.createConversation);
+    this.router.get(`/find/:friendId`, AuthMiddleware,AuthSecretMiddleware, this.conversationController.findConversationByFriendId);
 
     // (optionnel) récupérer les conversations de l'utilisateur
     this.router.get(`/`, AuthMiddleware, AuthSecretMiddleware, this.conversationController.getUserConversations);

@@ -35,18 +35,24 @@ export class ConversationService {
     if (existing) return existing;
 
     try {
-      //sinon on crée la conversation
-      console.log('🧠 Création de conversation entre', userSecretId, 'et', friendId);
       const conversation = await prisma.conversation.create({
         data: {
           author: { connect: { ID: userSecretId } }, // on connecte l'auteur
           participants: {
-            create: [{ user: { connect: { ID: userSecretId } } }, { user: { connect: { ID: friendId } } }],
+            create: [
+              { user: { connect: { ID: userSecretId } } },
+              { user: { connect: { ID: friendId } } }
+            ],
           },
         },
-        include: { participants: true },
+        include: {
+          participants: {
+            include: {
+              user:true
+            }
+          } 
+        },
       });
-      console.log('✅ Conversation créée avec id:', conversation.id);
       return conversation;
     } catch (error) {
       console.error('❌ Erreur Prisma :', error);
@@ -80,8 +86,51 @@ export class ConversationService {
   public getConversationById = async (conversationId: string) => {
     const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
 
-    if (!conversation) throw new HttpException(409, 'Conversation introuvable !');
+    if (!conversation) throw new HttpException(404, 'Conversation introuvable !');
 
     return conversation;
+  };
+
+  public findConversationByFriendId = async (userSecretId: string, friendId: string) => {
+    // Vérifie si une conversation existe déjà entre ces deux utilisateurs
+    const existing = await prisma.conversation.findFirst({
+      where: {
+        participants: {
+          every: {
+            userId: {
+              in: [userSecretId, friendId]
+            }
+          }
+        }
+      },
+      include: {
+        author:true,
+        participants: {
+          include: {
+            user:true
+          }
+        }
+      }
+    });
+
+    if (existing) {
+      return existing;
+    }
+
+    const newConv = await prisma.conversation.create({
+      data: {
+        author: {
+          connect: { ID: userSecretId },
+        },
+        participants: {
+          create: [
+            { userId: userSecretId },
+            { userId: friendId }
+          ],
+        }
+      }
+    });
+
+    return newConv;
   };
 }
