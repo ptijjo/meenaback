@@ -2,7 +2,7 @@ import { Service } from 'typedi';
 import prisma from '../utils/prisma';
 import { Notifications } from '../interfaces/notification.interface';
 import { HttpException } from '../exceptions/httpException';
-import { CreateNotificationDto } from '../dtos/notifications.dto';
+import { CreateNotificationDto, UpdateNotificationDto } from '../dtos/notifications.dto';
 import { NotifiableType, NotificationType } from '@prisma/client';
 
 @Service()
@@ -94,4 +94,26 @@ public getNewsNotifications = async (userId: string): Promise<Notifications[]> =
 
     return newNotification;
   };
+
+  public updateNotification = async (notificationId: string,notificationData:UpdateNotificationDto) => {
+    const notification: Notifications | null = await this.notification.findUnique({ where: { id: notificationId, read: false } });
+
+    if (!notification) throw new HttpException(404, 'Pas de notifications');
+
+    const updateNotif = await this.notification.update({
+      where: {
+        id: notification.id,
+      },
+      data: {
+        ...notificationData
+      },
+      include: {
+        receiver: true,
+        sender: true,
+      }
+    },);
+
+
+    return updateNotif;
+  }
 }

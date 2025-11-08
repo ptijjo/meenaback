@@ -78,7 +78,7 @@ export class App {
   }
 
   public listen() {
-    this.server.listen(this.port, () => {
+    this.server.listen({ port: this.port, host:"0.0.0.0"}, () => {
       logger.info(`=================================`);
       logger.info(`======= ENV: ${this.env} =======`);
       logger.info(`🚀 App listening on the port ${this.port}`);

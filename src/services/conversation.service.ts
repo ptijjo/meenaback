@@ -2,6 +2,7 @@ import { Service } from 'typedi';
 import prisma from '../utils/prisma';
 import { HttpException } from '../exceptions/httpException';
 import { UserSecret } from '../interfaces/userSecret.interface';
+import { cp } from 'fs';
 
 @Service()
 export class ConversationService {
@@ -133,4 +134,44 @@ export class ConversationService {
 
     return newConv;
   };
+
+  public createConversationGroup = async (groupId: string,) => {
+    //On recherche le groupe ainsi que tous ces participants
+    const group = await prisma.group.findUnique({
+      where: {
+        id: groupId
+      },
+      include: {
+        members: true,
+        conversations:true,
+      }
+    });
+
+    if (!group) throw new HttpException(404, "Groupe introuvable !");
+    if(group.conversations.length>0) throw new HttpException(401,"Une conversation existe déja")
+
+    const conversation = await prisma.conversation.create({
+      data: {
+        isGroup: true,
+        groupId: group.id,
+        name: group.name,
+        avatar: "https://vibz.s3.eu-central-1.amazonaws.com/logo/photoProfil.png",
+        authorId: group.createdById
+      },
+      include: {
+        participants:true
+      }
+    });
+
+    //  ajout des participants
+     await prisma.conversationParticipant.createMany({
+      data: group.members.map(member => ({
+        userId: member.userId,
+        conversationId:conversation.id
+      })),
+      skipDuplicates:true,
+    });
+
+    return conversation;
+  }
 }

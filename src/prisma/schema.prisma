@@ -155,19 +155,19 @@ model Group {
   id          String     @id @default(cuid())
   name        String
   description String
-  createdById String
+  createdById String     @unique
   createdBy   UserSecret @relation("UserCreatedGroups", fields: [createdById], references: [ID])
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
-  members       GroupMember[]
-  conversations Conversation[]
+  members      GroupMember[]
+  conversation Conversation?
 }
 
 model GroupMember {
   id       String    @id @default(cuid())
-  userId   String
-  groupId  String
+  userId   String    @unique
+  groupId  String    @unique
   role     RoleGroup @default(member)
   joinedAt DateTime  @default(now())
 
@@ -197,7 +197,7 @@ model Friendship {
 model Conversation {
   id        String     @id @default(cuid())
   isGroup   Boolean    @default(false)
-  groupId   String?
+  groupId   String?    @unique
   group     Group?     @relation(fields: [groupId], references: [id])
   name      String?
   avatar    String?

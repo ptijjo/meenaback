@@ -1,5 +1,5 @@
 import { NotifiableType, NotificationType } from "@prisma/client"
-import { IsIn, IsString } from "class-validator";
+import { IsBoolean, IsDate, IsIn, IsOptional, IsString } from "class-validator";
 
 
 export class CreateNotificationDto{
@@ -12,4 +12,15 @@ export class CreateNotificationDto{
     @IsString()
     public targetType: NotifiableType;
        
+}
+
+export class UpdateNotificationDto{
+
+    @IsOptional()
+    @IsDate()
+    public seenAt?: Date;
+
+    @IsOptional()
+    @IsBoolean()
+    public read: boolean;
 }

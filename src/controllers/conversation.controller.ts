@@ -52,4 +52,15 @@ export class ConversationController {
       next(error);
     }
   };
+
+  public createConversationGroup = async (req: RequestWithUser, res: Response, next: NextFunction) => {
+    try {
+      const groupId: string = req.params.id;
+      const conversationG = await this.conversationService.createConversationGroup(groupId);
+
+      res.status(201).json({ message: "Nouvelle conversation de groupe crée", data: conversationG });
+    } catch (error) {
+      next(error)
+    }
+  }
 }
