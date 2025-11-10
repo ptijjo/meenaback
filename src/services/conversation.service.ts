@@ -1,8 +1,7 @@
 import { Service } from 'typedi';
 import prisma from '../utils/prisma';
 import { HttpException } from '../exceptions/httpException';
-import { UserSecret } from '../interfaces/userSecret.interface';
-import { cp } from 'fs';
+
 
 @Service()
 export class ConversationService {
@@ -143,12 +142,12 @@ export class ConversationService {
       },
       include: {
         members: true,
-        conversations:true,
+        conversation:true,
       }
     });
 
     if (!group) throw new HttpException(404, "Groupe introuvable !");
-    if(group.conversations.length>0) throw new HttpException(401,"Une conversation existe déja")
+    if(group.conversation) throw new HttpException(401,"Une conversation existe déja")
 
     const conversation = await prisma.conversation.create({
       data: {

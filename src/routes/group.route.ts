@@ -21,8 +21,8 @@ export class GroupRoute implements Routes {
   }
 
   private initializeRoutes() {
-      this.router.get('/', AuthMiddleware, AuthSecretMiddleware, RoleGuard([]), this.controller.findAllGroups);
-    this.router.get('/:id', AuthMiddleware,AuthSecretMiddleware, this.controller.findGroupById);
+    this.router.get('/', AuthMiddleware, AuthSecretMiddleware, RoleGuard([]), this.controller.findAllGroups);
+    this.router.get('/:id', AuthMiddleware,AuthSecretMiddleware,RoleGuard([]), this.controller.findGroupById);
     this.router.post('/', AuthMiddleware,AuthSecretMiddleware, ValidationMiddleware(CreateGroupDto), this.controller.createGroup);
     this.router.patch('/:id', AuthMiddleware,AuthSecretMiddleware, ValidationMiddleware(UpdateGroupDto), this.controller.updateGroup);
     this.router.delete('/:id', AuthMiddleware,AuthSecretMiddleware, this.controller.deleteGroup);

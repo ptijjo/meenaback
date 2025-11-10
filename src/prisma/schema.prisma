@@ -116,6 +116,8 @@ model UserSecret {
   groupMembers          GroupMember[]
   messages              Message[]
   message               Message[]                 @relation("ReceivedMessages")
+
+  messageRecipients MessageRecipient[]
 }
 
 model LoginHistory {
@@ -156,7 +158,7 @@ model Group {
   name        String
   description String
   createdById String     @unique
-  createdBy   UserSecret @relation("UserCreatedGroups", fields: [createdById], references: [ID])
+  createdBy   UserSecret @relation("UserCreatedGroups", fields: [createdById], references: [ID],onDelete: Cascade)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
@@ -166,12 +168,12 @@ model Group {
 
 model GroupMember {
   id       String    @id @default(cuid())
-  userId   String    @unique
-  groupId  String    @unique
+  userId   String    
+  groupId  String    
   role     RoleGroup @default(member)
   joinedAt DateTime  @default(now())
 
-  user  UserSecret @relation(fields: [userId], references: [ID])
+  user  UserSecret @relation(fields: [userId], references: [ID],onDelete: Cascade)
   group Group      @relation(fields: [groupId], references: [id])
 
   @@unique([userId, groupId])
@@ -237,17 +239,32 @@ model Message {
   read           Boolean     @default(false)
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
-  receiverId     String
+  receiverId     String?
   senderId       String
   conversationId String
 
   sender       UserSecret   @relation(fields: [senderId], references: [ID])
   conversation Conversation @relation(fields: [conversationId], references: [id])
-  receiver     UserSecret   @relation("ReceivedMessages", fields: [receiverId], references: [ID])
+  receiver     UserSecret?   @relation("ReceivedMessages", fields: [receiverId], references: [ID])
 
   @@index([senderId])
   @@index([conversationId])
   @@index([createdAt])
+  recipients MessageRecipient[]
+}
+
+model MessageRecipient {
+  id         String   @id @default(cuid())
+  messageId  String
+  userId     String
+  
+  deliveredAt DateTime?
+  readAt      DateTime?
+
+  message    Message    @relation(fields: [messageId], references: [id])
+  user       UserSecret @relation(fields: [userId], references: [ID])
+
+  @@unique([messageId, userId]) // ✅ un seul recipient par user/message
 }
 
 //=======================================

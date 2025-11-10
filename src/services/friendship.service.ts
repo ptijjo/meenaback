@@ -103,7 +103,7 @@ export class FriendshipService {
   }
 
   // Liste d'amis
-  public async getFriends(userSecretId: string): Promise<any> {
+  public async getFriends(userSecretId: string): Promise<any[]> {
 
     const friendships = await this.friendship.findMany({
       where: {
