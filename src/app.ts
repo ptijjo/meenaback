@@ -61,10 +61,10 @@ export class App {
     Promise.all([this.redisClient.connect(), this.subRedisClient.connect()])
       .then(() => {
         this.io.adapter(createAdapter(this.redisClient, this.subRedisClient));
-        console.log('✅ Socket.IO Redis Adapter initialized.');
+        logger.info('✅ Socket.IO Redis Adapter initialized.');
       })
       .catch(err => {
-      console.error('❌ Failed to initialize Redis Adapter:', err);
+      logger.error('❌ Failed to initialize Redis Adapter:', err);
     })
 
      async () => await this.redisConnect();
@@ -96,7 +96,10 @@ export class App {
     this.app.use(morgan(LOG_FORMAT_MORGAN, { stream }));
     this.app.use(cors({ origin: ORIGIN, credentials: CREDENTIALS }));
     this.app.use(hpp());
-    this.app.use(helmet());
+    this.app.use(helmet({
+      crossOriginResourcePolicy: { policy: "cross-origin" },
+      contentSecurityPolicy: false,
+    }));
     this.app.use(compression());
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));

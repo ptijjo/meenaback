@@ -1,9 +1,5 @@
 import { TokenData } from '../interfaces/auth.interface';
 
-// export const createCookie = (tokenData: TokenData): string => {
-//   return `Authorization=${tokenData.token}; HttpOnly; Max-Age=${tokenData.expiresIn};SameSite=Lax`;
-// };
-
 // Assurez-vous d'avoir ceci pour la PROD (HTTPS OBLIGATOIRE)
 const isProduction = process.env.NODE_ENV === 'production';
 
