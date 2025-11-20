@@ -14,7 +14,49 @@ export class MessageRoute implements Routes {
   }
 
   private initializeRoutes() {
+    /**
+     * @swagger
+     * /messages:
+     *   post:
+     *     tags: [Messages]
+     *     summary: Create a new message
+     *     security:
+     *       - bearerAuth: []
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             properties:
+     *               conversationId:
+     *                 type: string
+     *               content:
+     *                 type: string
+     *     responses:
+     *       201:
+     *         description: Message created
+     */
     this.router.post(`/`, AuthMiddleware, AuthSecretMiddleware, this.message.createMessage);
+    
+    /**
+     * @swagger
+     * /messages/{id}:
+     *   get:
+     *     tags: [Messages]
+     *     summary: Get messages by conversation ID
+     *     security:
+     *       - bearerAuth: []
+     *     parameters:
+     *       - in: path
+     *         name: id
+     *         required: true
+     *         schema:
+     *           type: string
+     *     responses:
+     *       200:
+     *         description: List of messages
+     */
     this.router.get(`/:id`, AuthMiddleware, AuthSecretMiddleware, this.message.findAll);
   }
 }

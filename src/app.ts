@@ -64,11 +64,11 @@ export class App {
         logger.info('✅ Socket.IO Redis Adapter initialized.');
       })
       .catch(err => {
-      logger.error('❌ Failed to initialize Redis Adapter:', err);
-    })
+        logger.error('❌ Failed to initialize Redis Adapter:', err);
+      });
 
-     async () => await this.redisConnect();
-     async () => await this.initializeSocketAdapter();
+    async () => await this.redisConnect();
+    async () => await this.initializeSocketAdapter();
 
     this.initializeMiddlewares();
     this.initializeRoutes(routes);
@@ -78,7 +78,7 @@ export class App {
   }
 
   public listen() {
-    this.server.listen({ port: this.port, host:"0.0.0.0"}, () => {
+    this.server.listen({ port: this.port, host: '0.0.0.0' }, () => {
       logger.info(`=================================`);
       logger.info(`======= ENV: ${this.env} =======`);
       logger.info(`🚀 App listening on the port ${this.port}`);
@@ -91,15 +91,21 @@ export class App {
   }
 
   private initializeMiddlewares() {
+    // Chemin absolu du public à la racine du projet
+    const __rootDir = path.resolve(__dirname, ".."); // remonte depuis dist vers racine
+    const publicPath = path.join(__rootDir, 'public');
+
     this.app.set('trust proxy', 1);
-    this.app.use('/public', express.static(path.join(__dirname, '..', 'public')));
+    this.app.use('/public', express.static(publicPath));
     this.app.use(morgan(LOG_FORMAT_MORGAN, { stream }));
     this.app.use(cors({ origin: ORIGIN, credentials: CREDENTIALS }));
     this.app.use(hpp());
-    this.app.use(helmet({
-      crossOriginResourcePolicy: { policy: "cross-origin" },
-      contentSecurityPolicy: false,
-    }));
+    this.app.use(
+      helmet({
+        crossOriginResourcePolicy: { policy: 'cross-origin' },
+        contentSecurityPolicy: false,
+      }),
+    );
     this.app.use(compression());
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
@@ -140,14 +146,30 @@ export class App {
 
   private initializeSwagger() {
     const options = {
-      swaggerDefinition: {
+      definition: {
+        openapi: '3.0.0',
         info: {
-          title: 'REST API',
+          title: 'Meena API',
           version: '1.0.0',
-          description: 'Example docs',
+          description: 'API documentation for Meena backend',
+        },
+        servers: [
+          {
+            url: `http://localhost:${this.port}`,
+            description: 'Development server',
+          },
+        ],
+        components: {
+          securitySchemes: {
+            bearerAuth: {
+              type: 'http',
+              scheme: 'bearer',
+              bearerFormat: 'JWT',
+            },
+          },
         },
       },
-      apis: ['swagger.yaml'],
+      apis: ['./src/routes/*.ts', './src/controllers/*.ts'],
     };
 
     const specs = swaggerJSDoc(options);
@@ -198,7 +220,7 @@ export class App {
           console.error(`⚠️ Auth échouée pour socket ${socket.ID}: ${err.message}`);
           return next(err);
         }
-        console.log("🧩 Auth handshake reçu :", socket.handshake.auth);
+        console.log('🧩 Auth handshake reçu :', socket.handshake.auth);
         next();
       });
     });

@@ -16,7 +16,38 @@ export class NotificationRoute implements Routes {
   }
 
   private initializeRoutes() {
+    /**
+     * @swagger
+     * /notification:
+     *   get:
+     *     tags: [Notifications]
+     *     summary: Get user notifications
+     *     security:
+     *       - bearerAuth: []
+     *     responses:
+     *       200:
+     *         description: List of notifications
+     */
     this.router.get('/', AuthMiddleware,AuthSecretMiddleware, this.controller.getNotification);
+    
+    /**
+     * @swagger
+     * /notification/{id}:
+     *   get:
+     *     tags: [Notifications]
+     *     summary: Mark notification as read
+     *     security:
+     *       - bearerAuth: []
+     *     parameters:
+     *       - in: path
+     *         name: id
+     *         required: true
+     *         schema:
+     *           type: string
+     *     responses:
+     *       200:
+     *         description: Notification updated
+     */
     this.router.get('/:id', AuthMiddleware,AuthSecretMiddleware, this.controller.updateNotification);
     
   }
