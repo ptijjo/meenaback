@@ -38,7 +38,8 @@ export class App {
   constructor(routes: Routes[]) {
     this.app = express();
     this.env = NODE_ENV || 'development';
-    this.port = PORT || 8585;
+    // Adapte au proxy Nginx qui pointe sur localhost:8800
+    this.port = PORT || 8800;
     this.server = http.createServer(this.app);
 
     this.io = require('socket.io')(this.server, {
@@ -145,6 +146,9 @@ export class App {
   }
 
   private initializeSwagger() {
+    // Chemins absolus pour éviter les problèmes de résolution depuis dist/
+    const __rootDir = path.resolve(__dirname, '..');
+    
     const options = {
       definition: {
         openapi: '3.0.0',
@@ -153,10 +157,11 @@ export class App {
           version: '1.0.0',
           description: 'API documentation for Meena backend',
         },
+        // Utilise une URL relative pour être compatible derrière Nginx
         servers: [
           {
-            url: `http://localhost:${this.port}`,
-            description: 'Development server',
+            url: '/',
+            description: this.env === 'development' ? 'Development server' : 'Server behind proxy',
           },
         ],
         components: {
@@ -169,11 +174,42 @@ export class App {
           },
         },
       },
-      apis: ['./src/routes/*.ts', './src/controllers/*.ts'],
+      // Toujours scanner les sources TypeScript car SWC supprime les commentaires JSDoc
+      apis: [
+        path.join(__rootDir, 'src/routes/*.ts'),
+        path.join(__rootDir, 'src/controllers/*.ts'),
+      ],
     };
 
-    const specs = swaggerJSDoc(options);
-    this.app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
+    logger.info(`📂 Swagger scanning: ${options.apis.join(', ')}`);
+
+    let specs;
+    try {
+      specs = swaggerJSDoc(options);
+      logger.info(`📄 Swagger spec generated with ${Object.keys(specs.paths || {}).length} endpoints`);
+    } catch (error) {
+      logger.error('❌ Failed to generate Swagger spec:', error);
+      specs = { openapi: '3.0.0', info: options.definition.info, paths: {} };
+    }
+    
+    // Expose raw OpenAPI JSON at root and under /api for compatibility
+    this.app.get('/api-docs.json', (_req, res) => {
+      res.type('application/json').send(specs);
+    });
+    this.app.get('/api/api-docs.json', (_req, res) => {
+      res.type('application/json').send(specs);
+    });
+    
+    // Mount Swagger UI qui consomme les endpoints JSON (validation automatique)
+    this.app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(undefined, {
+      swaggerOptions: { url: '/api-docs.json' }
+    }));
+    this.app.use('/api/api-docs', swaggerUi.serve, swaggerUi.setup(undefined, {
+      swaggerOptions: { url: '/api/api-docs.json' }
+    }));
+
+    logger.info('✅ Swagger UI mounted at /api-docs and /api/api-docs');
+    logger.info('✅ Swagger JSON available at /api-docs.json and /api/api-docs.json');
   }
 
   private initializeErrorHandling() {

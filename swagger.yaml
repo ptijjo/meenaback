@@ -1,123 +1,122 @@
+openapi: 3.0.3
+info:
+  title: Meena API
+  version: 1.0.0
+  description: API documentation for Meena backend
+servers:
+  - url: http://localhost:8585
+    description: Development server
 tags:
-- name: users
-  description: users API
-
+  - name: users
+    description: users API
 paths:
-# [GET] users
   /users:
     get:
       tags:
-      - users
+        - users
       summary: Find All Users
       responses:
-        200:
-          description: 'OK'
-        500:
-          description: 'Server Error'
-
-# [POST] users
+        '200':
+          description: OK
+        '500':
+          description: Server Error
     post:
       tags:
-      - users
+        - users
       summary: Add User
-      parameters:
-      - name: body
-        in: body
-        description: user Data
+      requestBody:
         required: true
-        schema:
-          $ref: '#/definitions/users'
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
       responses:
-        201:
-          description: 'Created'
-        400:
-          description: 'Bad Request'
-        409:
-          description: 'Conflict'
-        500:
-          description: 'Server Error'
-
-# [GET] users/id
+        '201':
+          description: Created
+        '400':
+          description: Bad Request
+        '409':
+          description: Conflict
+        '500':
+          description: Server Error
   /users/{id}:
     get:
       tags:
-      - users
+        - users
       summary: Find User By Id
       parameters:
-      - name: id
-        in: path
-        description: User Id
-        required: true
-        type: integer
+        - name: id
+          in: path
+          description: User Id
+          required: true
+          schema:
+            type: integer
+            format: int64
       responses:
-        200:
-          description: 'OK'
-        409:
-          description: 'Conflict'
-        500:
-          description: 'Server Error'
-
-# [PUT] users/id
+        '200':
+          description: OK
+        '409':
+          description: Conflict
+        '500':
+          description: Server Error
     put:
       tags:
-      - users
+        - users
       summary: Update User By Id
       parameters:
-      - name: id
-        in: path
-        description: user Id
+        - name: id
+          in: path
+          description: User Id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
         required: true
-        type: integer
-      - name: body
-        in: body
-        description: user Data
-        required: true
-        schema:
-          $ref: '#/definitions/users'
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
       responses:
-        200:
-          description: 'OK'
-        400:
-          description: 'Bad Request'
-        409:
-          description: 'Conflict'
-        500:
-          description: 'Server Error'
-
-# [DELETE] users/id
+        '200':
+          description: OK
+        '400':
+          description: Bad Request
+        '409':
+          description: Conflict
+        '500':
+          description: Server Error
     delete:
       tags:
-      - users
+        - users
       summary: Delete User By Id
       parameters:
-      - name: id
-        in: path
-        description: user Id
-        required: true
-        type: integer
+        - name: id
+          in: path
+          description: User Id
+          required: true
+          schema:
+            type: integer
+            format: int64
       responses:
-        200:
-          description: 'OK'
-        409:
-          description: 'Conflict'
-        500:
-          description: 'Server Error'
-
-# definitions
-definitions:
-  users:
-    type: object
-    required:
+        '200':
+          description: OK
+        '409':
+          description: Conflict
+        '500':
+          description: Server Error
+components:
+  schemas:
+    User:
+      type: object
+      required:
         - email
         - password
-    properties:
-      email:
-        type: string
-        description: user Email
-      password:
-        type: string
-        description: user Password
-
-schemes:
- - https
- - http
+      properties:
+        email:
+          type: string
+          format: email
+          description: user Email
+        password:
+          type: string
+          description: user Password
