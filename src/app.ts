@@ -146,8 +146,9 @@ export class App {
   }
 
   private initializeSwagger() {
-    // Chemins absolus pour éviter les problèmes de résolution depuis dist/
-    const __rootDir = path.resolve(__dirname, '..');
+    // Chemins absolus pour éviter les problèmes de résolution depuis dist/src/
+    // __dirname = dist/src, donc remonter de 2 niveaux pour atteindre la racine
+    const __rootDir = path.resolve(__dirname, '../..');
     
     const options = {
       definition: {
