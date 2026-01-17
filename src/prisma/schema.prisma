@@ -125,6 +125,9 @@ model LoginHistory {
   createdAt DateTime @default(now())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
 }
 
 model Session {
@@ -139,6 +142,10 @@ model Session {
   expiresAt DateTime
   isRevoked Boolean   @default(false)
   revokedAt DateTime?
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([isRevoked])
 }
 
 model LoginAttempts {
@@ -148,6 +155,10 @@ model LoginAttempts {
   success   Boolean
   ipAddress String
   createdAt DateTime @default(now())
+
+  @@index([emailName])
+  @@index([ipAddress])
+  @@index([createdAt])
 }
 
 // ======================================
@@ -191,6 +202,9 @@ model Friendship {
   addressee UserSecret @relation("FriendAddressee", fields: [addresseeId], references: [ID])
 
   @@unique([requesterId, addresseeId])
+  @@index([requesterId])
+  @@index([addresseeId])
+  @@index([status])
 }
 
 // ======================================
@@ -226,6 +240,8 @@ model ConversationParticipant {
   conversation Conversation @relation(fields: [conversationId], references: [id])
 
   @@unique([userId, conversationId])
+  @@index([userId])
+  @@index([conversationId])
 }
 
 // ======================================
@@ -265,6 +281,8 @@ model MessageRecipient {
   user       UserSecret @relation(fields: [userId], references: [ID])
 
   @@unique([messageId, userId]) // ✅ un seul recipient par user/message
+  @@index([userId])
+  @@index([readAt])
 }
 
 //=======================================
@@ -284,4 +302,8 @@ model Notification {
   receiver   UserSecret       @relation(name: "receveur", fields: [receiverId], references: [ID], onDelete: Cascade)
   senderId   String
   sender     UserSecret       @relation(name: "demandeur", fields: [senderId], references: [ID], onDelete: Cascade)
+
+  @@index([receiverId])
+  @@index([read])
+  @@index([createdAt])
 }

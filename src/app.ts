@@ -53,11 +53,24 @@ export class App {
 
     this.redisClient = createClient({
       url: `redis://:${process.env.REDIS_PASSWORD}@localhost:6379`,
+      socket: {
+        reconnectStrategy: (retries: number) => {
+          if (retries > 10) {
+            logger.error('❌ Redis: Trop de tentatives de reconnexion, arrêt');
+            return new Error('Redis connection failed after 10 retries');
+          }
+          const delay = Math.min(retries * 100, 3000); // Retry exponentiel jusqu'à 3s max
+          logger.warn(`⚠️ Redis: Tentative de reconnexion ${retries} dans ${delay}ms`);
+          return delay;
+        },
+      },
     });
     this.subRedisClient = this.redisClient.duplicate();
 
-    this.redisClient.on('error', err => console.error('❌ Redis Client Error', err));
-    this.subRedisClient.on('error', err => console.error('❌ SubRedis Client Error', err));
+    this.redisClient.on('error', err => logger.error('❌ Redis Client Error:', this.sanitizeError(err)));
+    this.subRedisClient.on('error', err => logger.error('❌ SubRedis Client Error:', this.sanitizeError(err)));
+    this.redisClient.on('connect', () => logger.info('✅ Redis Client connecté'));
+    this.redisClient.on('reconnecting', () => logger.info('🔄 Redis Client reconnexion...'));
 
     Promise.all([this.redisClient.connect(), this.subRedisClient.connect()])
       .then(() => {
@@ -65,7 +78,7 @@ export class App {
         logger.info('✅ Socket.IO Redis Adapter initialized.');
       })
       .catch(err => {
-        logger.error('❌ Failed to initialize Redis Adapter:', err);
+        logger.error('❌ Failed to initialize Redis Adapter:', err instanceof Error ? err.message : String(err));
       });
 
     async () => await this.redisConnect();
@@ -104,12 +117,24 @@ export class App {
     this.app.use(
       helmet({
         crossOriginResourcePolicy: { policy: 'cross-origin' },
-        contentSecurityPolicy: false,
+        contentSecurityPolicy: {
+          directives: {
+            defaultSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'", 'https://unpkg.com'],
+            scriptSrc: ["'self'", "'unsafe-inline'", 'https://unpkg.com'],
+            imgSrc: ["'self'", 'data:', 'https:', 'http:'],
+            connectSrc: ["'self'", ORIGIN || ''],
+            fontSrc: ["'self'", 'data:', 'https:'],
+            objectSrc: ["'none'"],
+            mediaSrc: ["'self'"],
+            frameSrc: ["'none'"],
+          },
+        },
       }),
     );
     this.app.use(compression());
-    this.app.use(express.json());
-    this.app.use(express.urlencoded({ extended: true }));
+    this.app.use(express.json({ limit: '10mb' }));
+    this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
     this.app.use(cookieParser());
     this.app.use((req, res, next) => {
       res.header('Access-Control-Allow-Credentials', 'true'); // Souvent requis par certains navigateurs
@@ -220,7 +245,7 @@ export class App {
   public async initRedis() {
     if (!this.redisClient.isOpen) {
       await this.redisClient.connect();
-      console.log('✅ Redis connecté avec succès !');
+      logger.info('✅ Redis connecté avec succès !');
     }
   }
 
@@ -228,7 +253,7 @@ export class App {
     try {
       await this.initRedis();
     } catch (error) {
-      console.error('❌ Erreur lors de la connexion Redis:', error);
+      logger.error('❌ Erreur lors de la connexion Redis:', error instanceof Error ? error.message : String(error));
     }
   }
 
@@ -245,7 +270,7 @@ export class App {
       // L'adaptateur prend un client Pub et un client Sub
       this.io.adapter(createAdapter(this.redisClient as any, subClient as any));
     } catch (error) {
-      console.error("❌ Erreur lors de la configuration de l'adaptateur Redis :", error);
+      logger.error("❌ Erreur lors de la configuration de l'adaptateur Redis :", error instanceof Error ? error.message : String(error));
     }
   }
 
@@ -254,10 +279,13 @@ export class App {
     this.io.use((socket, next) => {
       socketAuthMiddleware(socket, err => {
         if (err) {
-          console.error(`⚠️ Auth échouée pour socket ${socket.ID}: ${err.message}`);
+          logger.warn(`⚠️ Auth échouée pour socket ${socket.id || 'unknown'}`);
           return next(err);
         }
-        console.log('🧩 Auth handshake reçu :', socket.handshake.auth);
+        // Ne pas logger les détails d'auth qui peuvent contenir des tokens
+        if (this.env === 'development') {
+          logger.debug('🧩 Auth handshake reçu');
+        }
         next();
       });
     });
@@ -283,7 +311,9 @@ export class App {
       socket.on('joinConversation', (conversationId: string) => {
         const roomName = `conversation:${conversationId}`;
         socket.join(roomName);
-        console.log(`💬 ${user?.friendId || user?.ID} a rejoint la room ${roomName}`);
+        if (this.env === 'development') {
+          logger.debug(`💬 User a rejoint la room ${roomName}`);
+        }
 
         // notifier les autres membres de la room
         socket.to(roomName).emit('userJoined', {
@@ -301,7 +331,9 @@ export class App {
       // Quand un message est envoyé dans une conversation
       socket.on('sendMessage', ({ conversationId, message }) => {
         const roomName = `conversation:${conversationId}`;
-        console.log(`🗨️ Message de ${user?.friendId || user?.ID} dans ${roomName} :`, message);
+        if (this.env === 'development') {
+          logger.debug(`🗨️ Message envoyé dans ${roomName}`);
+        }
 
         // Envoi du message uniquement aux membres de la room
         this.io.to(roomName).emit('newMessage', {
@@ -320,12 +352,30 @@ export class App {
 
       //Quand l'utilisateur se déconnecte
       socket.on('disconnect', reason => {
-        console.log(`${user.ID} s'est déconnecté(e), cause : ${reason}`);
+        if (this.env === 'development') {
+          logger.debug(`User déconnecté, cause : ${reason}`);
+        }
       });
     });
   }
 
   public getSocketInstance() {
     return this.io;
+  }
+
+  private sanitizeError(error: any): any {
+    if (!error) return error;
+    if (typeof error === 'string') {
+      // Masquer les tokens JWT et mots de passe dans les messages d'erreur
+      return error
+        .replace(/Bearer\s+[\w\-._~+\/]+=*/gi, 'Bearer [REDACTED]')
+        .replace(/password["\s:=]+[^\s"',}]+/gi, 'password: [REDACTED]')
+        .replace(/token["\s:=]+[^\s"',}]+/gi, 'token: [REDACTED]')
+        .replace(/secret["\s:=]+[^\s"',}]+/gi, 'secret: [REDACTED]');
+    }
+    if (error.message) {
+      error.message = this.sanitizeError(error.message);
+    }
+    return error;
   }
 }

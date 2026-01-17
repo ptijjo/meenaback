@@ -7,6 +7,7 @@ import { UserSecretController } from '../controllers/userSecret.controller';
 import { AuthSecretMiddleware } from '../middlewares/userSecret.middleware';
 import AvatarSecret from '../middlewares/uploadAvatarSecret.middleware';
 import resizeAvatarSecret from '../middlewares/resizeAvatarSecret.middleware';
+import { uploadRateLimiter } from '../middlewares/rateLimit.middleware';
 
 export class UserSecretRoute implements Routes {
   public path = '/userSecrets';
@@ -102,7 +103,7 @@ export class UserSecretRoute implements Routes {
      *       200:
      *         description: User secret updated
      */
-    this.router.patch(`/:id`, AuthMiddleware, AuthSecretMiddleware, AvatarSecret, resizeAvatarSecret, this.user.updateUser);
+    this.router.patch(`/:id`, AuthMiddleware, AuthSecretMiddleware, uploadRateLimiter, AvatarSecret, resizeAvatarSecret, this.user.updateUser);
     
   }
 }

@@ -5,6 +5,7 @@ import { HttpException } from '../exceptions/httpException';
 import { RequestWithUser, DataStoredInToken } from '../interfaces/auth.interface';
 import { cacheService } from '../server';
 import prisma from '../utils/prisma';
+import { logger } from '../utils/logger';
 
 // Calcule la durée de vie du cache une seule fois
 const CACHE_TTL: number = Number(ACCESS_TOKEN_EXPIRES_IN);
@@ -54,7 +55,8 @@ export const AuthMiddleware = async (req: RequestWithUser, res: Response, next: 
     }
   } catch (error) {
     // Erreur lors du décodage (token expiré, signature invalide, etc.)
-    console.error('JWT Verification Error:', error.name, error.message);
+    // Logger uniquement le type d'erreur, pas les détails du token
+    logger.error(`JWT Verification Error: ${error instanceof Error ? error.name : 'Unknown error'}`);
     return next(new HttpException(401, 'Wrong authentication token'));
   }
 };

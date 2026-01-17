@@ -3,6 +3,7 @@ import { Routes } from '../interfaces/routes.interface';
 import { AuthMiddleware } from '../middlewares/auth.middleware';
 import { MessageController } from '../controllers/message.controller';
 import { AuthSecretMiddleware } from '../middlewares/userSecret.middleware';
+import { messageRateLimiter } from '../middlewares/rateLimit.middleware';
 
 export class MessageRoute implements Routes {
   public path = '/messages';
@@ -37,7 +38,7 @@ export class MessageRoute implements Routes {
      *       201:
      *         description: Message created
      */
-    this.router.post(`/`, AuthMiddleware, AuthSecretMiddleware, this.message.createMessage);
+    this.router.post(`/`, AuthMiddleware, AuthSecretMiddleware, messageRateLimiter, this.message.createMessage);
     
     /**
      * @swagger

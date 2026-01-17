@@ -12,8 +12,33 @@ if (!existsSync(logDir)) {
   mkdirSync(logDir);
 }
 
-// Define log format
-const logFormat = winston.format.printf(({ timestamp, level, message }) => `${timestamp} ${level}: ${message}`);
+// Fonction pour sanitizer les logs (masquer tokens, passwords, secrets)
+const sanitizeMessage = (message: any): string => {
+  if (typeof message !== 'string') {
+    message = JSON.stringify(message);
+  }
+  // Masquer les tokens JWT
+  message = message.replace(/Bearer\s+[\w\-._~+\/]+=*/gi, 'Bearer [REDACTED]');
+  // Masquer les mots de passe
+  message = message.replace(/password["\s:=]+[^\s"',}]+/gi, 'password: [REDACTED]');
+  message = message.replace(/"password":\s*"[^"]*"/gi, '"password": "[REDACTED]"');
+  // Masquer les tokens
+  message = message.replace(/token["\s:=]+[^\s"',}]+/gi, 'token: [REDACTED]');
+  message = message.replace(/"token":\s*"[^"]*"/gi, '"token": "[REDACTED]"');
+  // Masquer les secrets
+  message = message.replace(/secret["\s:=]+[^\s"',}]+/gi, 'secret: [REDACTED]');
+  message = message.replace(/"secret":\s*"[^"]*"/gi, '"secret": "[REDACTED]"');
+  // Masquer les clés d'API
+  message = message.replace(/(api[_-]?key|apikey)["\s:=]+[^\s"',}]+/gi, 'apikey: [REDACTED]');
+  message = message.replace(/"api[_-]?key":\s*"[^"]*"/gi, '"apikey": "[REDACTED]"');
+  return message;
+};
+
+// Define log format avec sanitization
+const logFormat = winston.format.printf(({ timestamp, level, message }) => {
+  const sanitizedMessage = sanitizeMessage(message);
+  return `${timestamp} ${level}: ${sanitizedMessage}`;
+});
 
 /*
  * Log Level
